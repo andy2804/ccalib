@@ -15,7 +15,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "camera.h"
+#include "../include/camera.h"
 
 
 using namespace std;
@@ -64,6 +64,7 @@ void V4L2Camera::init() {
         perror("Capabilities Query");
         exit(1);
     }
+
     if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
         perror("Single-planar video capture");
         exit(1);
@@ -71,7 +72,7 @@ void V4L2Camera::init() {
 
     // Set video format
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;    // 16-bit 4:2:2
+    format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
     format.fmt.pix.width = V4L2Camera::width;
     format.fmt.pix.height = V4L2Camera::height;
 
@@ -136,7 +137,7 @@ void V4L2Camera::allocateBuffer() {
     buffer = buffertype;
 
     // Declare openCV Buffer address
-    cv::Mat raw_input(format.fmt.pix.height, format.fmt.pix.width, CV_8UC2, buffer_start);
+    cv::Mat raw_input(format.fmt.pix.height, format.fmt.pix.width, CV_8UC3, buffer_start);
     V4L2Camera::raw_input = raw_input;
 }
 

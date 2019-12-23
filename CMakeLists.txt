@@ -8,6 +8,7 @@ set(CMAKE_CXX_FLAGS "-std=c++17 -lstdc++fs")
 
 find_package(OpenGL REQUIRED)
 find_package(SDL2 REQUIRED)
+find_package(OpenCV REQUIRED)
 
 add_library("glad" "glad/src/glad.c")
 
@@ -32,6 +33,8 @@ set(sources
     imgui/imgui_impl_opengl3.h
     imgui/imgui_impl_sdl.cpp
     imgui/imgui_impl_sdl.h
+    v4l2_device/src/camera.cpp
+    v4l2_device/include/camera.h
     )
 
 add_executable(ccalib main.cpp ${sources})
@@ -41,6 +44,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         ${SDL2_LIBRARIES}
         ${OPENGL_gl_LIBRARY}
         ${CMAKE_DL_LIBS}
+        ${OpenCV_LIBRARIES}
         stdc++fs
         )
 

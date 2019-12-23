@@ -2,8 +2,8 @@
 // Created by andya on 02.07.18.
 //
 
-#ifndef V4L2_CAMERA
-#define V4L2_CAMERA
+#ifndef V4L2_CAMERA_H
+#define V4L2_CAMERA_H
 
 #include <string>
 #include <linux/videodev2.h>

@@ -2,6 +2,7 @@
 #include "imgui/imgui_impl_sdl.h"
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui_internal.h"
+#include "v4l2_device/include/camera.h"
 #include <stdio.h>
 #include <vector>
 #include <iostream>
@@ -11,6 +12,36 @@
 
 using namespace std;
 namespace fs = std::experimental::filesystem;
+
+void mat2Texture(cv::Mat &image, GLuint &imageTexture) {
+    if (image.empty()) {
+        std::cout << "image empty" << std::endl;
+    } else {
+        //glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+        glGenTextures(1, &imageTexture);
+        glBindTexture(GL_TEXTURE_2D, imageTexture);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        // Set texture clamping method
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+        cv::cvtColor(image, image, CV_RGB2BGR);
+
+        glTexImage2D(GL_TEXTURE_2D,         // Type of texture
+                     0,                   // Pyramid level (for mip-mapping) - 0 is the top level
+                     GL_RGB,              // Internal colour format to convert to
+                     image.cols,          // Image width  i.e. 640 for Kinect in standard mode
+                     image.rows,          // Image height i.e. 480 for Kinect in standard mode
+                     0,                   // Border width in pixels (can either be 1 or 0)
+                     GL_RGB,              // Input image format (i.e. GL_RGB, GL_RGBA, GL_BGR etc.)
+                     GL_UNSIGNED_BYTE,    // Image data type
+                     image.ptr());        // The actual image data itself
+    }
+}
 
 // Main code
 int main(int, char **) {
@@ -71,16 +102,25 @@ int main(int, char **) {
     // Load Fonts
     io.Fonts->AddFontFromFileTTF("../resources/Roboto-Regular.ttf", 16.0f);
 
-    // Our state
+    // State variables
     bool show_demo_window = true;
+    int camera_curr = 0;
+    int width_parameter_window = 320;
+    int framerate = 10;
 
     // Get all v4l2 devices
     const fs::path device_dir("/dev/v4l/by-id");
     vector<string> cameras;
 
     for (const auto &entry : fs::directory_iterator(device_dir)) {
-        cameras.push_back(entry.path().filename());
+        cameras.push_back(entry.path());
     }
+
+    // Try to open camera connection
+    V4L2Camera camera = V4L2Camera(cameras[0], 640, 480);
+//    camera.setFramerate(framerate);
+    camera.allocateBuffer();
+    camera.startStream();
 
     // Main loop
     bool done = false;
@@ -109,10 +149,9 @@ int main(int, char **) {
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
 
-        // Show a simple window
+        // Show parameters window
         {
             // Set next window size & pos
-            int width_parameter_window = 320;
             ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
             ImGui::SetNextWindowSize(ImVec2(width_parameter_window, io.DisplaySize.y), ImGuiCond_Always);
 
@@ -124,13 +163,46 @@ int main(int, char **) {
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Select Device");
             ImGui::SameLine();
-            ImGui::Button("Item##1");
+            if (ImGui::BeginCombo("camera_selector", cameras[camera_curr].c_str(), 0)) {
+                for (int i = 0; i < cameras.size(); i++) {
+                    bool is_selected = (cameras[camera_curr] == cameras[i]);
+                    if (ImGui::Selectable(cameras[i].c_str(), is_selected))
+                        camera_curr = i;
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+                }
+                ImGui::EndCombo();
+            }
 
 
             ImGui::Checkbox("Demo Window", &show_demo_window);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                         ImGui::GetIO().Framerate);
+            ImGui::End();
+        }
+
+        // Show image preview
+        {
+            // TODO Only render if active camera connection
+
+            // Set next window size & pos
+            ImGui::SetNextWindowPos(ImVec2(width_parameter_window, 0), ImGuiCond_Once);
+            ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - width_parameter_window, io.DisplaySize.y),
+                                     ImGuiCond_Always);
+
+            ImGui::Begin("Preview", nullptr,
+                         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                         ImGuiWindowFlags_NoScrollbar);
+
+            // Camera image
+            cv::Mat img;
+            img = camera.captureRawFrame();
+            GLuint texture;
+            mat2Texture(img, texture);
+
+            ImGui::Image((void*)(intptr_t)texture, ImVec2(img.cols, img.rows));
+
             ImGui::End();
         }
 
