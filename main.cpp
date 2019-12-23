@@ -109,18 +109,26 @@ int main(int, char **) {
     int framerate = 10;
 
     // Get all v4l2 devices
-    const fs::path device_dir("/dev/v4l/by-id");
+    const fs::path device_dir("/dev");
     vector<string> cameras;
 
     for (const auto &entry : fs::directory_iterator(device_dir)) {
-        cameras.push_back(entry.path());
+        if (entry.path().string().find("video") != string::npos)
+            cameras.push_back(entry.path());
     }
 
     // Try to open camera connection
-    V4L2Camera camera = V4L2Camera(cameras[0], 640, 480);
+    cv::VideoCapture camera(0);
+    if (!camera.isOpened())
+        CV_Assert("Cam open failed");
+
+    camera.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
+    camera.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
+    camera.set(CV_CAP_PROP_FPS, 30);
+//    V4L2Camera camera = V4L2Camera(cameras[0], 640, 480);
 //    camera.setFramerate(framerate);
-    camera.allocateBuffer();
-    camera.startStream();
+//    camera.allocateBuffer();
+//    camera.startStream();
 
     // Main loop
     bool done = false;
@@ -163,7 +171,7 @@ int main(int, char **) {
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Select Device");
             ImGui::SameLine();
-            if (ImGui::BeginCombo("camera_selector", cameras[camera_curr].c_str(), 0)) {
+            if (ImGui::BeginCombo("##camera_selector", cameras[camera_curr].c_str(), 0)) {
                 for (int i = 0; i < cameras.size(); i++) {
                     bool is_selected = (cameras[camera_curr] == cameras[i]);
                     if (ImGui::Selectable(cameras[i].c_str(), is_selected))
@@ -197,7 +205,9 @@ int main(int, char **) {
 
             // Camera image
             cv::Mat img;
-            img = camera.captureRawFrame();
+//            img = camera.captureRawFrame();
+            camera >> img;
+//            cv::resize(img, img, cv::Size((int)ImGui::GetWindowWidth(), (int)ImGui::GetWindowHeight()));
             GLuint texture;
             mat2Texture(img, texture);
 
