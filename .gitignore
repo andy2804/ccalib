@@ -1,0 +1,20 @@
+# General
+.idea
+.metadata/
+
+# Build Files
+cmake*
+
+# Python
+__pychache__/
+*/__pychache__/
+*.pyc
+
+# Venv
+venv
+
+# Ini Files
+*.ini
+
+# Docker images
+*.tar
