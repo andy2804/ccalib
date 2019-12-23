@@ -15,7 +15,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "../include/camera.h"
+#include "include/camera.h"
 
 
 using namespace std;

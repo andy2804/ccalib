@@ -2,7 +2,7 @@
 #include "imgui/imgui_impl_sdl.h"
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui_internal.h"
-#include "v4l2_device/include/camera.h"
+#include "include/camera.h"
 #include <stdio.h>
 #include <vector>
 #include <iostream>
@@ -29,7 +29,7 @@ void mat2Texture(cv::Mat &image, GLuint &imageTexture) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
-        cv::cvtColor(image, image, CV_RGB2BGR);
+//        cv::cvtColor(image, image, CV_RGB2BGR);
 
         glTexImage2D(GL_TEXTURE_2D,         // Type of texture
                      0,                   // Pyramid level (for mip-mapping) - 0 is the top level
@@ -87,13 +87,100 @@ int main(int, char **) {
     ImGuiContext *ctx = ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     (void) io;
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-//    ImGuiStyle style = ImGui::GetStyle();
-    //ImGui::StyleColorsClassic();
+    ImGui::StyleColorsLight();
+
+    // Set custom style elements
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowTitleAlign = ImVec2(0.5, 0.5);
+    style.WindowRounding = 0;
+    style.FrameRounding = 5;
+    style.GrabRounding = 5;
+    style.PopupRounding = 5;
+    style.ScrollbarRounding = 8;
+    style.WindowBorderSize = 1;
+    style.WindowPadding = ImVec2(8, 8);
+    style.FramePadding = ImVec2(6, 6);
+    style.FrameBorderSize = 1;
+    style.ItemSpacing = ImVec2(6, 6);
+    style.ItemInnerSpacing = ImVec2(8, 8);
+    style.GrabMinSize = 5;
+    style.ScrollbarSize = 12;
+
+    // Set custom colors
+    ImVec4* colors = ImGui::GetStyle().Colors;
+    colors[ImGuiCol_Text]                   = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_TextDisabled]           = ImVec4(0.78f, 0.78f, 0.78f, 1.00f);
+    colors[ImGuiCol_WindowBg]               = ImVec4(0.93f, 0.93f, 0.93f, 1.00f);
+    colors[ImGuiCol_ChildBg]                = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_PopupBg]                = ImVec4(0.93f, 0.93f, 0.93f, 0.98f);
+    colors[ImGuiCol_Border]                 = ImVec4(0.00f, 0.00f, 0.00f, 0.04f);
+    colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_FrameBg]                = ImVec4(1.00f, 1.00f, 1.00f, 0.53f);
+    colors[ImGuiCol_FrameBgHovered]         = ImVec4(1.00f, 1.00f, 1.00f, 0.87f);
+    colors[ImGuiCol_FrameBgActive]          = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_TitleBg]                = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+    colors[ImGuiCol_TitleBgActive]          = ImVec4(0.93f, 0.84f, 0.32f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed]       = ImVec4(0.75f, 0.75f, 0.75f, 0.51f);
+    colors[ImGuiCol_MenuBarBg]              = ImVec4(0.86f, 0.86f, 0.86f, 1.00f);
+    colors[ImGuiCol_ScrollbarBg]            = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_ScrollbarGrab]          = ImVec4(0.69f, 0.69f, 0.69f, 0.80f);
+    colors[ImGuiCol_ScrollbarGrabHovered]   = ImVec4(0.49f, 0.49f, 0.49f, 0.80f);
+    colors[ImGuiCol_ScrollbarGrabActive]    = ImVec4(0.49f, 0.49f, 0.49f, 1.00f);
+    colors[ImGuiCol_CheckMark]              = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_SliderGrab]             = ImVec4(0.20f, 0.20f, 0.20f, 0.86f);
+    colors[ImGuiCol_SliderGrabActive]       = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_Button]                 = ImVec4(0.00f, 0.00f, 0.00f, 0.20f);
+    colors[ImGuiCol_ButtonHovered]          = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_ButtonActive]           = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_Header]                 = ImVec4(1.00f, 0.70f, 0.00f, 0.20f);
+    colors[ImGuiCol_HeaderHovered]          = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_HeaderActive]           = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_Separator]              = ImVec4(0.00f, 0.00f, 0.00f, 0.04f);
+    colors[ImGuiCol_SeparatorHovered]       = ImVec4(0.14f, 0.44f, 0.80f, 0.78f);
+    colors[ImGuiCol_SeparatorActive]        = ImVec4(0.14f, 0.44f, 0.80f, 1.00f);
+    colors[ImGuiCol_ResizeGrip]             = ImVec4(0.80f, 0.80f, 0.80f, 0.56f);
+    colors[ImGuiCol_ResizeGripHovered]      = ImVec4(0.71f, 0.71f, 0.71f, 0.91f);
+    colors[ImGuiCol_ResizeGripActive]       = ImVec4(0.00f, 0.00f, 0.00f, 0.95f);
+    colors[ImGuiCol_Tab]                    = ImVec4(0.76f, 0.80f, 0.84f, 0.93f);
+    colors[ImGuiCol_TabHovered]             = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
+    colors[ImGuiCol_TabActive]              = ImVec4(0.60f, 0.73f, 0.88f, 1.00f);
+    colors[ImGuiCol_TabUnfocused]           = ImVec4(0.92f, 0.93f, 0.94f, 0.99f);
+    colors[ImGuiCol_TabUnfocusedActive]     = ImVec4(0.74f, 0.82f, 0.91f, 1.00f);
+    colors[ImGuiCol_PlotLines]              = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
+    colors[ImGuiCol_PlotLinesHovered]       = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_PlotHistogram]          = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_PlotHistogramHovered]   = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_TextSelectedBg]         = ImVec4(1.00f, 0.20f, 0.20f, 0.39f);
+    colors[ImGuiCol_DragDropTarget]         = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
+    colors[ImGuiCol_NavHighlight]           = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
+    colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(0.70f, 0.70f, 0.70f, 0.70f);
+    colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.20f, 0.20f, 0.20f, 0.20f);
+    colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
+//    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.8, 0.8, 0.8, 1.0));
+//    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.00, 0.00, 0.00, 0.04));
+//    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0, 0.0, 0.0, 0.2));
+//    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0, 0.7, 0.0, 1.0));
+//    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0, 0.7, 0.0, 0.5));
+//    ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(1.0, 0.7, 0.0, 1.0));
+//    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1.0, 1.0, 1.0, 0.53));
+//    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0, 1.0, 1.0, 0.87));
+//    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0, 1.0, 1.0, 1.0));
+//    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(1.0, 0.7, 0.0, 0.2));
+//    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.0, 0.7, 0.0, 1.0));
+//    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0, 0.7, 0.0, 0.5));
+//    ImGui::PushStyleColor(ImGuiCol_PlotLinesHovered, ImVec4(1.0, 0.7, 0.0, 0.5));
+//    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(1.0, 0.7, 0.0, 1.0));
+//    ImGui::PushStyleColor(ImGuiCol_PlotHistogramHovered, ImVec4(1.0, 0.7, 0.0, 0.5));
+//    ImGui::PushStyleColor(ImGuiCol_ResizeGripHovered, ImVec4(0.71, 0.71, 0.71, 0.91));
+//    ImGui::PushStyleColor(ImGuiCol_ResizeGripActive, ImVec4(0.0, 0.0, 0.0, 0.95));
+//    ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, ImVec4(0.0, 0.0, 0.0, 0.0));
+//    ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0.0, 0.0, 0.0, 0.04));
+//    ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.2, 0.2, 0.2, 0.86));
+//    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0, 0.7, 0.0, 1.0));
+//    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4(0.94, 0.94, 0.94, 1.0));
+//    ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, ImVec4(1.0, 0.2, 0.2, 0.39));
 
     // Setup Platform/Renderer bindings
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
@@ -103,10 +190,14 @@ int main(int, char **) {
     io.Fonts->AddFontFromFileTTF("../resources/Roboto-Regular.ttf", 16.0f);
 
     // State variables
-    bool show_demo_window = true;
+    bool show_demo_window = false;
+    bool calibration_mode = false;
+    bool stream_on = false;
     int camera_curr = 0;
     int width_parameter_window = 320;
     int framerate = 10;
+    cv::Mat img = cv::Mat::zeros(cv::Size(640, 480), CV_8UC3);
+    GLuint texture;
 
     // Get all v4l2 devices
     const fs::path device_dir("/dev");
@@ -122,8 +213,8 @@ int main(int, char **) {
     if (!camera.isOpened())
         CV_Assert("Cam open failed");
 
-    camera.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
-    camera.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
+    camera.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+    camera.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
     camera.set(CV_CAP_PROP_FPS, 30);
 //    V4L2Camera camera = V4L2Camera(cameras[0], 640, 480);
 //    camera.setFramerate(framerate);
@@ -182,6 +273,21 @@ int main(int, char **) {
                 ImGui::EndCombo();
             }
 
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Camera");
+            ImGui::SameLine();
+            camera.grab();
+            if (ImGui::Button("Stream")) {
+                stream_on = !stream_on;
+            }
+
+            if (stream_on) {
+                camera.retrieve(img);
+                cv::cvtColor(img, img, CV_BGR2RGB);
+                glDeleteTextures(1, &texture);
+                mat2Texture(img, texture);
+            }
+
 
             ImGui::Checkbox("Demo Window", &show_demo_window);
 
@@ -204,12 +310,9 @@ int main(int, char **) {
                          ImGuiWindowFlags_NoScrollbar);
 
             // Camera image
-            cv::Mat img;
+
 //            img = camera.captureRawFrame();
-            camera >> img;
 //            cv::resize(img, img, cv::Size((int)ImGui::GetWindowWidth(), (int)ImGui::GetWindowHeight()));
-            GLuint texture;
-            mat2Texture(img, texture);
 
             ImGui::Image((void*)(intptr_t)texture, ImVec2(img.cols, img.rows));
 

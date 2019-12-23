@@ -33,8 +33,8 @@ set(sources
     imgui/imgui_impl_opengl3.h
     imgui/imgui_impl_sdl.cpp
     imgui/imgui_impl_sdl.h
-    v4l2_device/src/camera.cpp
-    v4l2_device/include/camera.h
+        camera.cpp
+        include/camera.h
     )
 
 add_executable(ccalib main.cpp ${sources})
