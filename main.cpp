@@ -180,15 +180,16 @@ int main(int, char **) {
     int camera_currfmt = 0;
     int chkbrd_rows = 8;
     int chkbrd_cols = 11;
+    float img_ratio = (float) camera_width / (float) camera_height;
     int width_parameter_window = 400;
-    vector <string> camera_fmt{"YUVY", "YUY2", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
-    vector <cv::Point2f> corners;
+    vector<string> camera_fmt{"YUVY", "YUY2", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
+    vector<cv::Point2f> corners;
     cv::Mat img = cv::Mat::zeros(cv::Size(camera_width, camera_height), CV_8UC3);
     GLuint texture;
 
     // Get all v4l2 devices
     const fs::path device_dir("/dev");
-    vector <string> cameras;
+    vector<string> cameras;
 
     for (const auto &entry : fs::directory_iterator(device_dir)) {
         if (entry.path().string().find("video") != string::npos)
@@ -211,7 +212,7 @@ int main(int, char **) {
 //    camera.startStream();
 
     // Main loop
-    SDL_SetWindowSize(window, width_parameter_window + img.cols, max(720, img.rows));
+//    SDL_SetWindowSize(window, width_parameter_window + img.cols, max(720, img.rows));
     bool done = false;
     while (!done) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -276,7 +277,12 @@ int main(int, char **) {
                     camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
                     camera.grab();
                     camera.retrieve(img);
-                    SDL_SetWindowSize(window, width_parameter_window + img.cols, max(720, img.rows));
+
+                    // Update params
+                    camera_width = img.cols;
+                    camera_height = img.rows;
+                    img_ratio = (float) camera_width / (float) camera_height;
+//                    SDL_SetWindowSize(window, width_parameter_window + img.cols, max(720, img.rows));
                 } else
                     camera.release();
             }
@@ -334,10 +340,6 @@ int main(int, char **) {
                 camera.grab();
                 camera.retrieve(img);
 
-                // Update params
-                camera_width = img.cols;
-                camera_height = img.rows;
-
                 cv::cvtColor(img, img, CV_BGR2RGB);
             }
 
@@ -385,9 +387,9 @@ int main(int, char **) {
             // TODO Only render if active camera connection
 
             // Set next window size & pos
-            ctx->CurrentWindow->Size.x = width_parameter_window + img.cols;
+//            ctx->CurrentWindow->Size.x = width_parameter_window + img.cols;
             ImGui::SetNextWindowPos(ImVec2(width_parameter_window, 0), ImGuiCond_Once);
-            ImGui::SetNextWindowSize(ImVec2(img.cols, io.DisplaySize.y),
+            ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - width_parameter_window, io.DisplaySize.y),
                                      ImGuiCond_Always);
 
             ImGui::Begin("Preview", nullptr,
@@ -399,10 +401,18 @@ int main(int, char **) {
                 glDeleteTextures(1, &texture);
                 mat2Texture(img, texture);
             }
+            if (ImGui::GetWindowHeight() * img_ratio > ImGui::GetWindowWidth())
+                cv::resize(img, img,
+                           cv::Size((int) ImGui::GetWindowWidth(), (int) (ImGui::GetWindowWidth() / img_ratio)));
+            else
+                cv::resize(img, img,
+                           cv::Size((int) (ImGui::GetWindowHeight() * img_ratio), (int) ImGui::GetWindowHeight()));
+
 //            img = camera.captureRawFrame();
 //            cv::resize(img, img, cv::Size((int)ImGui::GetWindowWidth(), (int)ImGui::GetWindowHeight()));
 
-            ImGui::SetCursorPosY((int) (io.DisplaySize.y - img.rows) / 2);
+            ImGui::SetCursorPos(
+                    ImVec2((ImGui::GetWindowWidth() - img.cols) / 2, (ImGui::GetWindowHeight() - img.rows) / 2));
             ImGui::Image((void *) (intptr_t) texture, ImVec2(img.cols, img.rows));
 
             ImGui::End();
