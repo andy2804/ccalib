@@ -62,8 +62,8 @@ int main(int, char **) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_WindowFlags window_flags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-                                                      SDL_WINDOW_ALLOW_HIGHDPI);
+    SDL_WindowFlags window_flags = (SDL_WindowFlags) (
+            SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window *window = SDL_CreateWindow("ccalib", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
                                           window_flags);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
@@ -92,7 +92,7 @@ int main(int, char **) {
     ImGui::StyleColorsLight();
 
     // Set custom style elements
-    ImGuiStyle& style = ImGui::GetStyle();
+    ImGuiStyle &style = ImGui::GetStyle();
     style.WindowTitleAlign = ImVec2(0.5, 0.5);
     style.WindowRounding = 0;
     style.FrameRounding = 5;
@@ -101,86 +101,63 @@ int main(int, char **) {
     style.ScrollbarRounding = 8;
     style.WindowBorderSize = 1;
     style.WindowPadding = ImVec2(8, 8);
-    style.FramePadding = ImVec2(6, 6);
+    style.FramePadding = ImVec2(8, 6);
     style.FrameBorderSize = 1;
-    style.ItemSpacing = ImVec2(6, 6);
+    style.ItemSpacing = ImVec2(8, 8);
     style.ItemInnerSpacing = ImVec2(8, 8);
     style.GrabMinSize = 5;
     style.ScrollbarSize = 12;
 
     // Set custom colors
-    ImVec4* colors = ImGui::GetStyle().Colors;
-    colors[ImGuiCol_Text]                   = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
-    colors[ImGuiCol_TextDisabled]           = ImVec4(0.78f, 0.78f, 0.78f, 1.00f);
-    colors[ImGuiCol_WindowBg]               = ImVec4(0.93f, 0.93f, 0.93f, 1.00f);
-    colors[ImGuiCol_ChildBg]                = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    colors[ImGuiCol_PopupBg]                = ImVec4(0.93f, 0.93f, 0.93f, 0.98f);
-    colors[ImGuiCol_Border]                 = ImVec4(0.00f, 0.00f, 0.00f, 0.04f);
-    colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    colors[ImGuiCol_FrameBg]                = ImVec4(1.00f, 1.00f, 1.00f, 0.53f);
-    colors[ImGuiCol_FrameBgHovered]         = ImVec4(1.00f, 1.00f, 1.00f, 0.87f);
-    colors[ImGuiCol_FrameBgActive]          = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
-    colors[ImGuiCol_TitleBg]                = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
-    colors[ImGuiCol_TitleBgActive]          = ImVec4(0.93f, 0.84f, 0.32f, 1.00f);
-    colors[ImGuiCol_TitleBgCollapsed]       = ImVec4(0.75f, 0.75f, 0.75f, 0.51f);
-    colors[ImGuiCol_MenuBarBg]              = ImVec4(0.86f, 0.86f, 0.86f, 1.00f);
-    colors[ImGuiCol_ScrollbarBg]            = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    colors[ImGuiCol_ScrollbarGrab]          = ImVec4(0.69f, 0.69f, 0.69f, 0.80f);
-    colors[ImGuiCol_ScrollbarGrabHovered]   = ImVec4(0.49f, 0.49f, 0.49f, 0.80f);
-    colors[ImGuiCol_ScrollbarGrabActive]    = ImVec4(0.49f, 0.49f, 0.49f, 1.00f);
-    colors[ImGuiCol_CheckMark]              = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
-    colors[ImGuiCol_SliderGrab]             = ImVec4(0.20f, 0.20f, 0.20f, 0.86f);
-    colors[ImGuiCol_SliderGrabActive]       = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
-    colors[ImGuiCol_Button]                 = ImVec4(0.00f, 0.00f, 0.00f, 0.20f);
-    colors[ImGuiCol_ButtonHovered]          = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
-    colors[ImGuiCol_ButtonActive]           = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
-    colors[ImGuiCol_Header]                 = ImVec4(1.00f, 0.70f, 0.00f, 0.20f);
-    colors[ImGuiCol_HeaderHovered]          = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
-    colors[ImGuiCol_HeaderActive]           = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
-    colors[ImGuiCol_Separator]              = ImVec4(0.00f, 0.00f, 0.00f, 0.04f);
-    colors[ImGuiCol_SeparatorHovered]       = ImVec4(0.14f, 0.44f, 0.80f, 0.78f);
-    colors[ImGuiCol_SeparatorActive]        = ImVec4(0.14f, 0.44f, 0.80f, 1.00f);
-    colors[ImGuiCol_ResizeGrip]             = ImVec4(0.80f, 0.80f, 0.80f, 0.56f);
-    colors[ImGuiCol_ResizeGripHovered]      = ImVec4(0.71f, 0.71f, 0.71f, 0.91f);
-    colors[ImGuiCol_ResizeGripActive]       = ImVec4(0.00f, 0.00f, 0.00f, 0.95f);
-    colors[ImGuiCol_Tab]                    = ImVec4(0.76f, 0.80f, 0.84f, 0.93f);
-    colors[ImGuiCol_TabHovered]             = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
-    colors[ImGuiCol_TabActive]              = ImVec4(0.60f, 0.73f, 0.88f, 1.00f);
-    colors[ImGuiCol_TabUnfocused]           = ImVec4(0.92f, 0.93f, 0.94f, 0.99f);
-    colors[ImGuiCol_TabUnfocusedActive]     = ImVec4(0.74f, 0.82f, 0.91f, 1.00f);
-    colors[ImGuiCol_PlotLines]              = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
-    colors[ImGuiCol_PlotLinesHovered]       = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
-    colors[ImGuiCol_PlotHistogram]          = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
-    colors[ImGuiCol_PlotHistogramHovered]   = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
-    colors[ImGuiCol_TextSelectedBg]         = ImVec4(1.00f, 0.20f, 0.20f, 0.39f);
-    colors[ImGuiCol_DragDropTarget]         = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
-    colors[ImGuiCol_NavHighlight]           = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
-    colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(0.70f, 0.70f, 0.70f, 0.70f);
-    colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.20f, 0.20f, 0.20f, 0.20f);
-    colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
-//    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.8, 0.8, 0.8, 1.0));
-//    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.00, 0.00, 0.00, 0.04));
-//    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0, 0.0, 0.0, 0.2));
-//    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0, 0.7, 0.0, 1.0));
-//    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0, 0.7, 0.0, 0.5));
-//    ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(1.0, 0.7, 0.0, 1.0));
-//    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1.0, 1.0, 1.0, 0.53));
-//    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0, 1.0, 1.0, 0.87));
-//    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0, 1.0, 1.0, 1.0));
-//    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(1.0, 0.7, 0.0, 0.2));
-//    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.0, 0.7, 0.0, 1.0));
-//    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0, 0.7, 0.0, 0.5));
-//    ImGui::PushStyleColor(ImGuiCol_PlotLinesHovered, ImVec4(1.0, 0.7, 0.0, 0.5));
-//    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(1.0, 0.7, 0.0, 1.0));
-//    ImGui::PushStyleColor(ImGuiCol_PlotHistogramHovered, ImVec4(1.0, 0.7, 0.0, 0.5));
-//    ImGui::PushStyleColor(ImGuiCol_ResizeGripHovered, ImVec4(0.71, 0.71, 0.71, 0.91));
-//    ImGui::PushStyleColor(ImGuiCol_ResizeGripActive, ImVec4(0.0, 0.0, 0.0, 0.95));
-//    ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, ImVec4(0.0, 0.0, 0.0, 0.0));
-//    ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0.0, 0.0, 0.0, 0.04));
-//    ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.2, 0.2, 0.2, 0.86));
-//    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0, 0.7, 0.0, 1.0));
-//    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4(0.94, 0.94, 0.94, 1.0));
-//    ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, ImVec4(1.0, 0.2, 0.2, 0.39));
+    ImVec4 *colors = ImGui::GetStyle().Colors;
+    colors[ImGuiCol_Text] = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_TextDisabled] = ImVec4(0.78f, 0.78f, 0.78f, 1.00f);
+    colors[ImGuiCol_WindowBg] = ImVec4(0.93f, 0.93f, 0.93f, 1.00f);
+    colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_PopupBg] = ImVec4(0.93f, 0.93f, 0.93f, 0.98f);
+    colors[ImGuiCol_Border] = ImVec4(0.16f, 0.16f, 0.16f, 0.03f);
+    colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_FrameBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.53f);
+    colors[ImGuiCol_FrameBgHovered] = ImVec4(1.00f, 1.00f, 1.00f, 0.87f);
+    colors[ImGuiCol_FrameBgActive] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_TitleBg] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+    colors[ImGuiCol_TitleBgActive] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.75f, 0.75f, 0.75f, 0.51f);
+    colors[ImGuiCol_MenuBarBg] = ImVec4(0.86f, 0.86f, 0.86f, 1.00f);
+    colors[ImGuiCol_ScrollbarBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.69f, 0.69f, 0.69f, 0.80f);
+    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.49f, 0.49f, 0.49f, 0.80f);
+    colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.49f, 0.49f, 0.49f, 1.00f);
+    colors[ImGuiCol_CheckMark] = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_SliderGrab] = ImVec4(0.20f, 0.20f, 0.20f, 0.86f);
+    colors[ImGuiCol_SliderGrabActive] = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_Button] = ImVec4(0.00f, 0.00f, 0.00f, 0.10f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_Header] = ImVec4(1.00f, 0.70f, 0.00f, 0.20f);
+    colors[ImGuiCol_HeaderHovered] = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_HeaderActive] = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_Separator] = ImVec4(0.00f, 0.00f, 0.00f, 0.04f);
+    colors[ImGuiCol_SeparatorHovered] = ImVec4(0.14f, 0.44f, 0.80f, 0.78f);
+    colors[ImGuiCol_SeparatorActive] = ImVec4(0.14f, 0.44f, 0.80f, 1.00f);
+    colors[ImGuiCol_ResizeGrip] = ImVec4(0.80f, 0.80f, 0.80f, 0.56f);
+    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.71f, 0.71f, 0.71f, 0.91f);
+    colors[ImGuiCol_ResizeGripActive] = ImVec4(0.00f, 0.00f, 0.00f, 0.95f);
+    colors[ImGuiCol_Tab] = ImVec4(0.76f, 0.80f, 0.84f, 0.93f);
+    colors[ImGuiCol_TabHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
+    colors[ImGuiCol_TabActive] = ImVec4(0.60f, 0.73f, 0.88f, 1.00f);
+    colors[ImGuiCol_TabUnfocused] = ImVec4(0.92f, 0.93f, 0.94f, 0.99f);
+    colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.74f, 0.82f, 0.91f, 1.00f);
+    colors[ImGuiCol_PlotLines] = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
+    colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_PlotHistogram] = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_TextSelectedBg] = ImVec4(1.00f, 0.20f, 0.20f, 0.39f);
+    colors[ImGuiCol_DragDropTarget] = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
+    colors[ImGuiCol_NavHighlight] = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
+    colors[ImGuiCol_NavWindowingHighlight] = ImVec4(0.70f, 0.70f, 0.70f, 0.70f);
+    colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.20f, 0.20f, 0.20f, 0.20f);
+    colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
 
     // Setup Platform/Renderer bindings
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
@@ -193,35 +170,48 @@ int main(int, char **) {
     bool show_demo_window = false;
     bool calibration_mode = false;
     bool stream_on = false;
+    bool changed = false;
     int camera_curr = 0;
-    int width_parameter_window = 320;
-    int framerate = 10;
-    cv::Mat img = cv::Mat::zeros(cv::Size(640, 480), CV_8UC3);
+    int camera_width = 640;
+    int camera_height = 480;
+    int camera_fps = 30;
+    int camera_exposure = 33;   // in [ms]
+    bool camera_autoexp = false;
+    int camera_currfmt = 0;
+    int chkbrd_rows = 8;
+    int chkbrd_cols = 11;
+    int width_parameter_window = 400;
+    vector <string> camera_fmt{"YUVY", "YUY2", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
+    vector <cv::Point2f> corners;
+    cv::Mat img = cv::Mat::zeros(cv::Size(camera_width, camera_height), CV_8UC3);
     GLuint texture;
 
     // Get all v4l2 devices
     const fs::path device_dir("/dev");
-    vector<string> cameras;
+    vector <string> cameras;
 
     for (const auto &entry : fs::directory_iterator(device_dir)) {
         if (entry.path().string().find("video") != string::npos)
             cameras.push_back(entry.path());
     }
 
-    // Try to open camera connection
-    cv::VideoCapture camera(0);
+    // Try to open camera connection2
+    cv::VideoCapture camera(camera_curr);
     if (!camera.isOpened())
         CV_Assert("Cam open failed");
 
-    camera.set(CV_CAP_PROP_FRAME_WIDTH, 640);
-    camera.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-    camera.set(CV_CAP_PROP_FPS, 30);
+    camera.set(CV_CAP_PROP_FRAME_WIDTH, camera_width);
+    camera.set(CV_CAP_PROP_FRAME_HEIGHT, camera_height);
+    camera.set(CV_CAP_PROP_FPS, camera_fps);
+//    camera.set(CV_CAP_PROP_EXPOSURE, 0.25);
+    camera.set(CV_CAP_PROP_AUTO_EXPOSURE, camera_autoexp);
 //    V4L2Camera camera = V4L2Camera(cameras[0], 640, 480);
 //    camera.setFramerate(framerate);
 //    camera.allocateBuffer();
 //    camera.startStream();
 
     // Main loop
+    SDL_SetWindowSize(window, width_parameter_window + img.cols, max(720, img.rows));
     bool done = false;
     while (!done) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -260,6 +250,7 @@ int main(int, char **) {
 
             // Camera selector
             ImGui::AlignTextToFramePadding();
+            ImGui::PushItemWidth(-1);
             ImGui::Text("Select Device");
             ImGui::SameLine();
             if (ImGui::BeginCombo("##camera_selector", cameras[camera_curr].c_str(), 0)) {
@@ -273,24 +264,117 @@ int main(int, char **) {
                 ImGui::EndCombo();
             }
 
+            // Camera Controls
             ImGui::AlignTextToFramePadding();
-            ImGui::Text("Camera");
+            ImGui::Text("Camera Control");
             ImGui::SameLine();
-            camera.grab();
-            if (ImGui::Button("Stream")) {
+            if (ImGui::Button("Start / Stop Stream")) {
                 stream_on = !stream_on;
+                if (stream_on) {
+                    camera.open(camera_curr);
+                    camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
+                    camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
+                    camera.grab();
+                    camera.retrieve(img);
+                    SDL_SetWindowSize(window, width_parameter_window + img.cols, max(720, img.rows));
+                } else
+                    camera.release();
+            }
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Width");
+            ImGui::SameLine();
+            ImGui::PushItemWidth(64);
+            if (ImGui::InputInt("##camera_width", &camera_width, 0))
+                changed = true;
+            ImGui::SameLine();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Height");
+            ImGui::SameLine();
+            if (ImGui::InputInt("##camera_height", &camera_height, 0))
+                changed = true;
+            ImGui::PopItemWidth();
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Exposure Time");
+            ImGui::SameLine();
+            if (ImGui::SliderInt("##camera_exptime", &camera_exposure, 0, 1000, "%d [ms]")) {
+                changed = true;
+            }
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Select Format");
+            ImGui::SameLine();
+            if (ImGui::BeginCombo("##camera_fmt", camera_fmt[camera_currfmt].c_str(), 0)) {
+                for (int i = 0; i < camera_fmt.size(); i++) {
+                    bool is_selected = (camera_fmt[camera_currfmt] == camera_fmt[i]);
+                    if (ImGui::Selectable(camera_fmt[i].c_str(), is_selected))
+                        camera_currfmt = i;
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+                }
+                ImGui::EndCombo();
+                changed = true;
+            }
+
+            if (changed) {
+                stream_on = false;
+                calibration_mode = false;
+//                int32_t fourcc = 0;
+//                for (const char& c : camera_fmt[camera_currfmt]) {
+//                    fourcc <<= 8;
+//                    fourcc += c;
+//                }
+//                camera.set(CV_CAP_PROP_FOURCC, fourcc);
+//                camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure);
+                changed = false;
             }
 
             if (stream_on) {
+                camera.grab();
                 camera.retrieve(img);
+
+                // Update params
+                camera_width = img.cols;
+                camera_height = img.rows;
+
                 cv::cvtColor(img, img, CV_BGR2RGB);
-                glDeleteTextures(1, &texture);
-                mat2Texture(img, texture);
             }
 
+            // Camera Controls
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Calibration");
+            ImGui::SameLine();
+            if (ImGui::Button("Start / Stop")) {
+                calibration_mode = !calibration_mode;
+            }
 
-            ImGui::Checkbox("Demo Window", &show_demo_window);
+            if (calibration_mode && stream_on) {
+                cv::Mat gray(img.rows, img.cols, CV_8UC1);
+                cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
+                if (cv::findChessboardCorners(gray, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), corners,
+                                              CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE |
+                                              CV_CALIB_CB_FAST_CHECK)) {
+                    cv::cornerSubPix(gray, corners, cv::Size(11, 11), cv::Size(-1, -1),
+                                     cv::TermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 30, 0.1));
+                    cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), cv::Mat(corners), true);
+                }
+            }
 
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Rows");
+            ImGui::SameLine();
+            ImGui::PushItemWidth(64);
+            ImGui::InputInt("##chkbrd_rows", &chkbrd_rows, 0);
+            ImGui::SameLine();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Cols");
+            ImGui::SameLine();
+            ImGui::InputInt("##chkbrd_cols", &chkbrd_cols, 0);
+            ImGui::PopItemWidth();
+
+
+            ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetFontSize() - 8);
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                         ImGui::GetIO().Framerate);
             ImGui::End();
@@ -301,8 +385,9 @@ int main(int, char **) {
             // TODO Only render if active camera connection
 
             // Set next window size & pos
+            ctx->CurrentWindow->Size.x = width_parameter_window + img.cols;
             ImGui::SetNextWindowPos(ImVec2(width_parameter_window, 0), ImGuiCond_Once);
-            ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - width_parameter_window, io.DisplaySize.y),
+            ImGui::SetNextWindowSize(ImVec2(img.cols, io.DisplaySize.y),
                                      ImGuiCond_Always);
 
             ImGui::Begin("Preview", nullptr,
@@ -310,11 +395,15 @@ int main(int, char **) {
                          ImGuiWindowFlags_NoScrollbar);
 
             // Camera image
-
+            if (stream_on) {
+                glDeleteTextures(1, &texture);
+                mat2Texture(img, texture);
+            }
 //            img = camera.captureRawFrame();
 //            cv::resize(img, img, cv::Size((int)ImGui::GetWindowWidth(), (int)ImGui::GetWindowHeight()));
 
-            ImGui::Image((void*)(intptr_t)texture, ImVec2(img.cols, img.rows));
+            ImGui::SetCursorPosY((int) (io.DisplaySize.y - img.rows) / 2);
+            ImGui::Image((void *) (intptr_t) texture, ImVec2(img.cols, img.rows));
 
             ImGui::End();
         }
