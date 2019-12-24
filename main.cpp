@@ -43,6 +43,10 @@ void mat2Texture(cv::Mat &image, GLuint &imageTexture) {
     }
 }
 
+constexpr uint32_t fourcc(char const p[5]) {
+    return (((p[0]) & 255) + (((p[1]) & 255) << 8) + (((p[2]) & 255) << 16) + (((p[3]) & 255) << 24));
+}
+
 // Main code
 int main(int, char **) {
     // Setup SDL
@@ -175,14 +179,14 @@ int main(int, char **) {
     int camera_width = 640;
     int camera_height = 480;
     int camera_fps = 30;
-    int camera_exposure = 33;   // in [ms]
+    float camera_exposure = 0.333;   // in [ms]
     bool camera_autoexp = false;
     int camera_currfmt = 0;
     int chkbrd_rows = 8;
     int chkbrd_cols = 11;
     float img_ratio = (float) camera_width / (float) camera_height;
     int width_parameter_window = 400;
-    vector<string> camera_fmt{"YUVY", "YUY2", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
+    vector<string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
     vector<cv::Point2f> corners;
     cv::Mat img = cv::Mat::zeros(cv::Size(camera_width, camera_height), CV_8UC3);
     GLuint texture;
@@ -201,11 +205,13 @@ int main(int, char **) {
     if (!camera.isOpened())
         CV_Assert("Cam open failed");
 
-    camera.set(CV_CAP_PROP_FRAME_WIDTH, camera_width);
-    camera.set(CV_CAP_PROP_FRAME_HEIGHT, camera_height);
-    camera.set(CV_CAP_PROP_FPS, camera_fps);
-//    camera.set(CV_CAP_PROP_EXPOSURE, 0.25);
-    camera.set(CV_CAP_PROP_AUTO_EXPOSURE, camera_autoexp);
+
+//    camera.set(CV_CAP_PROP_FRAME_WIDTH, camera_width);
+//    camera.set(CV_CAP_PROP_FRAME_HEIGHT, camera_height);
+//    camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
+//    camera.set(CV_CAP_PROP_FPS, camera_fps);
+//    camera.set(CV_CAP_PROP_AUTO_EXPOSURE, 0.25);
+//    camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure);
 //    V4L2Camera camera = V4L2Camera(cameras[0], 640, 480);
 //    camera.setFramerate(framerate);
 //    camera.allocateBuffer();
@@ -273,8 +279,13 @@ int main(int, char **) {
                 stream_on = !stream_on;
                 if (stream_on) {
                     camera.open(camera_curr);
+                    camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
                     camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
                     camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
+//                    camera.set(CV_CAP_PROP_FOURCC, CV_FOURCC('M', 'J', 'P', 'G'));
+                    camera.set(CV_CAP_PROP_FPS, (double) camera_fps);
+                    camera.set(CV_CAP_PROP_AUTO_EXPOSURE, 0.25);
+                    camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure);
                     camera.grab();
                     camera.retrieve(img);
 
@@ -302,10 +313,18 @@ int main(int, char **) {
             ImGui::PopItemWidth();
 
             ImGui::AlignTextToFramePadding();
+            ImGui::Text("Framerate");
+            ImGui::SameLine();
+            if (ImGui::SliderInt("##camera_fps", &camera_fps, 0, 60)) {
+                changed = true;
+            }
+
+            ImGui::AlignTextToFramePadding();
             ImGui::Text("Exposure Time");
             ImGui::SameLine();
-            if (ImGui::SliderInt("##camera_exptime", &camera_exposure, 0, 1000, "%d [ms]")) {
-                changed = true;
+            if (ImGui::SliderFloat("##camera_exptime", &camera_exposure, 0, 1, "%.3f", 2.0)) {
+                camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure / 1.25);
+                //                changed = true;
             }
 
             ImGui::AlignTextToFramePadding();
@@ -326,14 +345,8 @@ int main(int, char **) {
             if (changed) {
                 stream_on = false;
                 calibration_mode = false;
-//                int32_t fourcc = 0;
-//                for (const char& c : camera_fmt[camera_currfmt]) {
-//                    fourcc <<= 8;
-//                    fourcc += c;
-//                }
-//                camera.set(CV_CAP_PROP_FOURCC, fourcc);
-//                camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure);
                 changed = false;
+                camera.release();
             }
 
             if (stream_on) {
