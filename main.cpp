@@ -14,6 +14,11 @@
 using namespace std;
 namespace fs = std::experimental::filesystem;
 
+struct calibration_instance {
+    cv::Mat img;
+    vector <cv::Point2f> corners;
+};
+
 void mat2Texture(cv::Mat &image, GLuint &imageTexture) {
     if (image.empty()) {
         std::cout << "image empty" << std::endl;
@@ -82,7 +87,7 @@ void ToggleButton(const char *str_id, bool *v) {
                                IM_COL32(255, 255, 255, 255));
 }
 
-void CoveredBar(const float &start, const float &stop) {
+void CoveredBar(const float &start, const float &stop, const float &indicator = -1) {
     ImVec2 p = ImGui::GetCursorScreenPos();
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
 
@@ -92,9 +97,16 @@ void CoveredBar(const float &start, const float &stop) {
 
     draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height),
                              ImGui::GetColorU32(ImVec4(0.78f, 0.78f, 0.78f, 1.0f)), height * 0.5f);
-    if (stop > start)
+    if (indicator >= 0)
+        draw_list->AddRectFilled(ImVec2(p.x + indicator * width - 2, p.y - 2),
+                                 ImVec2(p.x + indicator * width + 2, p.y + height + 2),
+                                 ImGui::GetColorU32(ImVec4(0.72f, 0.83f, 0.42f, 1.0f)), 1);
+
+    if (stop > start) {
         draw_list->AddRectFilled(ImVec2(p.x + start * width, p.y), ImVec2(p.x + stop * width, p.y + height),
-                                 ImGui::GetColorU32(ImVec4(0.64f, 0.83f, 0.34f, 1.0f)), height * 0.5f);
+                                 ImGui::GetColorU32(ImVec4(0.56f, 0.83f, 0.26f, 1.0f)), height * 0.5f);
+    }
+
 }
 
 // Main code
@@ -116,7 +128,7 @@ int main(int, char **) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_WindowFlags window_flags = (SDL_WindowFlags) (
+    SDL_WindowFlags window_flags = (SDL_WindowFlags)(
             SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window *window = SDL_CreateWindow("ccalib", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
                                           window_flags);
@@ -238,22 +250,29 @@ int main(int, char **) {
 
     int chkbrd_rows = 8;
     int chkbrd_cols = 11;
+
     float x_min = camera_width;
     float x_max = 0;
     float y_min = camera_height;
     float y_max = 0;
+    float size_min = camera_width * camera_height;
+    float size_max = 0;
+    float max_size = size_min;
+
+    cv::Point2f mean(camera_width / 2, camera_height / 2);
+    float size = max_size / 2;
 
     float img_ratio = (float) camera_width / (float) camera_height;
     int width_parameter_window = 320;
     vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
-    vector<string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
-    vector<cv::Point2f> corners;
+    vector <string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
+    vector <cv::Point2f> corners;
     cv::Mat img = cv::Mat::zeros(cv::Size(camera_width, camera_height), CV_8UC3);
     GLuint texture;
 
     // Get all v4l2 devices
     const fs::path device_dir("/dev");
-    vector<string> cameras;
+    vector <string> cameras;
 
     for (const auto &entry : fs::directory_iterator(device_dir)) {
         if (entry.path().string().find("video") != string::npos)
@@ -445,6 +464,9 @@ int main(int, char **) {
                 x_max = 0;
                 y_min = camera_height;
                 y_max = 0;
+                size_min = camera_width * camera_height;
+                size_max = 0;
+                max_size = sqrt(size_min * 0.9f);
             }
 
             ImGui::AlignTextToFramePadding();
@@ -471,52 +493,53 @@ int main(int, char **) {
                     cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), cv::Mat(corners), true);
                 }
 
-                cv::Point2f sum = std::accumulate(corners.begin(), corners.end(), cv::Point2f(0.0f, 0.0f),
-                                                  std::plus<cv::Point2f>());
-                cv::Point2f mean = sum * (1.0f / corners.size());
-                cv::Point2f var;
-                for (const auto &p : corners) {
-                    var.x += (p.x - mean.x) * (p.x - mean.x);
-                    var.y += (p.y - mean.y) * (p.y - mean.y);
-                }
-                var = 1.0f / corners.size() * var;
-                var.x = sqrt(var.x);
-                var.y = sqrt(var.y);
+//                cv::Point2f sum = std::accumulate(corners.begin(), corners.end(), cv::Point2f(0.0f, 0.0f),
+//                                                  std::plus<cv::Point2f>());
+//                cv::Point2f mean = sum * (1.0f / corners.size());
+//                cv::Point2f var;
+//                for (const auto &p : corners) {
+//                    var.x += (p.x - mean.x) * (p.x - mean.x);
+//                    var.y += (p.y - mean.y) * (p.y - mean.y);
+//                }
+//                var = 1.0f / corners.size() * var;
+//                var.x = sqrt(var.x);
+//                var.y = sqrt(var.y);
 
-                x_min = min(x_min, mean.x);
-                x_max = max(x_max, mean.x);
-                y_min = min(y_min, mean.y);
-                y_max = max(y_max, mean.y);
+                if (corners.size() > 0) {
+                    cv::RotatedRect rect = cv::minAreaRect(corners);
+                    mean = rect.center;
+                    size = sqrt(rect.size.area());
+                }
+
+                x_min = min(x_min, camera_width - mean.x);
+                x_max = max(x_max, camera_width - mean.x);
+                y_min = min(y_min, camera_height - mean.y);
+                y_max = max(y_max, camera_height - mean.y);
+                size_min = min(size_min, size);
+                size_max = max(size_max, size);
 
                 ImGui::AlignTextToFramePadding();
-                ImGui::Text("Corners x-mean");
-                ImGui::SameLine();
-                ImGui::PushItemWidth(64);
-                ImGui::InputFloat("##x_mean", &mean.x);
+                ImGui::Text("Horizontal Coverage");
 
                 CoveredBar((x_min - (0.1f * camera_width)) / camera_width,
-                           (x_max + (0.1f * camera_width)) / camera_width);
+                           (x_max + (0.1f * camera_width)) / camera_width,
+                           (camera_width - mean.x) / camera_width);
                 ImGui::NewLine();
 
                 ImGui::AlignTextToFramePadding();
-                ImGui::Text("Corners y-mean");
-                ImGui::SameLine();
-                ImGui::InputFloat("##y_mean", &mean.y);
+                ImGui::Text("Vertical Coverage");
 
                 CoveredBar((y_min - (0.1f * camera_height)) / camera_height,
-                           (y_max + (0.1f * camera_height)) / camera_height);
+                           (y_max + (0.1f * camera_height)) / camera_height,
+                           (camera_height - mean.y) / camera_height);
                 ImGui::NewLine();
 
                 ImGui::AlignTextToFramePadding();
-                ImGui::Text("Corners x-var");
-                ImGui::SameLine();
-                ImGui::InputFloat("##x_var", &var.x);
-
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Corners y-var");
-                ImGui::SameLine();
-                ImGui::InputFloat("##y_var", &var.y);
-                ImGui::PopItemWidth();
+                ImGui::Text("Size Coverage");
+                CoveredBar((size_min - (0.1f * max_size)) / max_size,
+                           (size_max + (0.1f * max_size)) / max_size,
+                           (size / max_size));
+                ImGui::NewLine();
             }
 
 
