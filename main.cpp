@@ -3,6 +3,7 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui_internal.h"
 #include "include/camera.h"
+#include <ctime>
 #include <stdio.h>
 #include <vector>
 #include <iostream>
@@ -14,7 +15,8 @@
 using namespace std;
 namespace fs = std::experimental::filesystem;
 
-struct calibration_instance {
+struct snapshot {
+    timeval id;
     cv::Mat img;
     vector <cv::Point2f> corners;
 };
@@ -235,6 +237,7 @@ int main(int, char **) {
     // State variables
     bool show_demo_window = false;
     bool calibration_mode = false;
+    bool camera_on = false;
     bool stream_on = false;
     bool changed = false;
     bool flip_img = false;
@@ -258,6 +261,9 @@ int main(int, char **) {
     float size_min = camera_width * camera_height;
     float size_max = 0;
     float max_size = size_min;
+
+    int snapshot_curr = -1;
+    vector<snapshot> instances;
 
     cv::Point2f mean(camera_width / 2, camera_height / 2);
     float size = max_size / 2;
@@ -350,8 +356,8 @@ int main(int, char **) {
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Camera");
             ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-            ToggleButton("##cam_toggle", &stream_on);
-            if (stream_on && ImGui::IsItemClicked(0)) {
+            ToggleButton("##cam_toggle", &camera_on);
+            if (camera_on && ImGui::IsItemClicked(0)) {
                 camera.open(camera_curr);
                 camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
                 camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
@@ -362,9 +368,12 @@ int main(int, char **) {
                 camera.grab();
                 camera.retrieve(img);
 
+                stream_on = true;
                 changed = true;
-            } else if (!stream_on)
+            } else if (!camera_on) {
                 camera.release();
+                stream_on = false;
+            }
 
             ImGui::Separator();
 
@@ -432,7 +441,7 @@ int main(int, char **) {
             ImGui::SameLine();
             ImGui::Checkbox("##flip", &flip_img);
 
-            if (changed && camera.isOpened()) {
+            if (changed && camera_on) {
                 // Update params
                 camera.grab();
                 camera.retrieve(img);
@@ -448,7 +457,6 @@ int main(int, char **) {
             if (stream_on) {
                 camera.grab();
                 camera.retrieve(img);
-
                 cv::cvtColor(img, img, CV_BGR2RGB);
             }
 
@@ -459,7 +467,7 @@ int main(int, char **) {
             ImGui::Text("Calibration");
             ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
             ToggleButton("##calib_toggle", &calibration_mode);
-            if (calibration_mode && ImGui::IsItemClicked(0)) {
+            if (camera_on && calibration_mode && ImGui::IsItemClicked(0)) {
                 x_min = camera_width;
                 x_max = 0;
                 y_min = camera_height;
@@ -467,7 +475,8 @@ int main(int, char **) {
                 size_min = camera_width * camera_height;
                 size_max = 0;
                 max_size = sqrt(size_min * 0.9f);
-            }
+            } else if (!camera_on)
+                calibration_mode = false;
 
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Rows");
@@ -481,42 +490,33 @@ int main(int, char **) {
             ImGui::InputInt("##chkbrd_cols", &chkbrd_cols, 0);
             ImGui::PopItemWidth();
 
-            if (calibration_mode && stream_on) {
-                cv::Mat gray(img.rows, img.cols, CV_8UC1);
-                cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
-                cv::cvtColor(gray, img, cv::COLOR_GRAY2RGB);
-                if (cv::findChessboardCorners(gray, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), corners,
-                                              CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE |
-                                              CV_CALIB_CB_FAST_CHECK)) {
-                    cv::cornerSubPix(gray, corners, cv::Size(11, 11), cv::Size(-1, -1),
-                                     cv::TermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 30, 0.1));
-                    cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), cv::Mat(corners), true);
+            if (calibration_mode) {
+                if (stream_on) {
+                    cv::Mat gray(img.rows, img.cols, CV_8UC1);
+                    cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
+                    cv::cvtColor(gray, img, cv::COLOR_GRAY2RGB);
+                    if (cv::findChessboardCorners(gray, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), corners,
+                                                  CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE |
+                                                  CV_CALIB_CB_FAST_CHECK)) {
+                        cv::cornerSubPix(gray, corners, cv::Size(11, 11), cv::Size(-1, -1),
+                                         cv::TermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 30, 0.1));
+                        cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), cv::Mat(corners),
+                                                  true);
+                    }
+
+                    if (corners.size() > 0) {
+                        cv::RotatedRect rect = cv::minAreaRect(corners);
+                        mean = rect.center;
+                        size = sqrt(rect.size.area());
+                    }
+
+                    x_min = min(x_min, camera_width - mean.x);
+                    x_max = max(x_max, camera_width - mean.x);
+                    y_min = min(y_min, camera_height - mean.y);
+                    y_max = max(y_max, camera_height - mean.y);
+                    size_min = min(size_min, size);
+                    size_max = max(size_max, size);
                 }
-
-//                cv::Point2f sum = std::accumulate(corners.begin(), corners.end(), cv::Point2f(0.0f, 0.0f),
-//                                                  std::plus<cv::Point2f>());
-//                cv::Point2f mean = sum * (1.0f / corners.size());
-//                cv::Point2f var;
-//                for (const auto &p : corners) {
-//                    var.x += (p.x - mean.x) * (p.x - mean.x);
-//                    var.y += (p.y - mean.y) * (p.y - mean.y);
-//                }
-//                var = 1.0f / corners.size() * var;
-//                var.x = sqrt(var.x);
-//                var.y = sqrt(var.y);
-
-                if (corners.size() > 0) {
-                    cv::RotatedRect rect = cv::minAreaRect(corners);
-                    mean = rect.center;
-                    size = sqrt(rect.size.area());
-                }
-
-                x_min = min(x_min, camera_width - mean.x);
-                x_max = max(x_max, camera_width - mean.x);
-                y_min = min(y_min, camera_height - mean.y);
-                y_max = max(y_max, camera_height - mean.y);
-                size_min = min(size_min, size);
-                size_max = max(size_max, size);
 
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("Horizontal Coverage");
@@ -540,10 +540,62 @@ int main(int, char **) {
                            (size_max + (0.1f * max_size)) / max_size,
                            (size / max_size));
                 ImGui::NewLine();
+
+                ImGui::Separator();
+                ImGui::NewLine();
+
+                // Collect snapshot button
+                if (ImGui::Button("Snapshot") && corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
+                    snapshot instance;
+                    gettimeofday(&instance.id, NULL);
+                    img.copyTo(instance.img);
+                    if (flip_img)
+                        cv::flip(instance.img, instance.img, 1);
+                    instance.corners.assign(corners.begin(), corners.end());
+                    instances.push_back(instance);
+                }
+
+                if (instances.size() > 0) {
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Collected Snapshots");
+                    {
+                        ImGui::ListBoxHeader("Snapshots", instances.size(), -1);
+                        for (int i = 0; i < instances.size(); i++) {
+                            bool is_selected = (i == snapshot_curr) ? true : false;
+                            double id = instances[i].id.tv_sec + (instances[i].id.tv_usec / 1e6);
+                            if (ImGui::Selectable(to_string(id).c_str(), is_selected)) {
+                                if (is_selected)
+                                    snapshot_curr = -1;
+                                else
+                                    snapshot_curr = i;
+                            }
+                            if (ImGui::BeginPopupContextItem()) {
+                                if (ImGui::Selectable("Remove")) {
+                                    instances.erase(instances.begin() + snapshot_curr);
+                                    snapshot_curr--;
+                                }
+                                ImGui::EndPopup();
+                            }
+                            if (is_selected)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::ListBoxFooter();
+                    }
+                }
+
+                if (snapshot_curr != -1) {
+                    stream_on = false;
+                    img = instances[snapshot_curr].img;
+                } else if (camera.isOpened() && !stream_on) {
+                    stream_on = true;
+                    camera.grab();
+                    camera.retrieve(img);
+                    cv::cvtColor(img, img, CV_BGR2RGB);
+                }
             }
 
-
-            ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetFontSize() - 8);
+            ImGui::NewLine();
+            ImGui::SetCursorPosY(ImGui::GetContentRegionMax().y - min(0.0f, ImGui::GetContentRegionAvail().y) - ImGui::GetFontSize() + ImGui::GetScrollY());
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                         ImGui::GetIO().Framerate);
             ImGui::End();
@@ -563,8 +615,8 @@ int main(int, char **) {
                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoScrollbar);
 
-            if (stream_on) {
-                if (flip_img)
+            if (camera_on) {
+                if (flip_img && stream_on)
                     cv::flip(img, img, 1);
                 glDeleteTextures(1, &texture);
                 mat2Texture(img, texture);
