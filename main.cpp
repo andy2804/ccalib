@@ -18,7 +18,7 @@ namespace fs = std::experimental::filesystem;
 struct snapshot {
     timeval id;
     cv::Mat img;
-    vector <cv::Point2f> corners;
+    vector<cv::Point2f> corners;
 };
 
 void mat2Texture(cv::Mat &image, GLuint &imageTexture) {
@@ -94,20 +94,19 @@ void CoveredBar(const float &start, const float &stop, const float &indicator = 
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
 
     float height = ImGui::GetFrameHeight() * 0.25f;
-    float width = ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 0.5f;
-    p.y += 0.375f * ImGui::GetFrameHeight();
+    float width = ImGui::GetContentRegionAvailWidth();
+    p.y += 0.25f * ImGui::GetFrameHeight();
 
     draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height),
                              ImGui::GetColorU32(ImVec4(0.78f, 0.78f, 0.78f, 1.0f)), height * 0.5f);
-    if (indicator >= 0)
-        draw_list->AddRectFilled(ImVec2(p.x + indicator * width - 2, p.y - 2),
-                                 ImVec2(p.x + indicator * width + 2, p.y + height + 2),
-                                 ImGui::GetColorU32(ImVec4(0.72f, 0.83f, 0.42f, 1.0f)), 1);
-
     if (stop > start) {
         draw_list->AddRectFilled(ImVec2(p.x + start * width, p.y), ImVec2(p.x + stop * width, p.y + height),
                                  ImGui::GetColorU32(ImVec4(0.56f, 0.83f, 0.26f, 1.0f)), height * 0.5f);
     }
+
+    if (indicator >= 0)
+        draw_list->AddCircleFilled(ImVec2(p.x + indicator * width, p.y + height / 2.0f), height,
+                                   ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 
 }
 
@@ -130,7 +129,7 @@ int main(int, char **) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(
+    SDL_WindowFlags window_flags = (SDL_WindowFlags) (
             SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window *window = SDL_CreateWindow("ccalib", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
                                           window_flags);
@@ -253,6 +252,7 @@ int main(int, char **) {
 
     int chkbrd_rows = 8;
     int chkbrd_cols = 11;
+    float chkbrd_size = 0.022;      // in [m]
 
     float x_min = camera_width;
     float x_max = 0;
@@ -271,14 +271,14 @@ int main(int, char **) {
     float img_ratio = (float) camera_width / (float) camera_height;
     int width_parameter_window = 320;
     vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
-    vector <string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
-    vector <cv::Point2f> corners;
+    vector<string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
+    vector<cv::Point2f> corners;
     cv::Mat img = cv::Mat::zeros(cv::Size(camera_width, camera_height), CV_8UC3);
     GLuint texture;
 
     // Get all v4l2 devices
     const fs::path device_dir("/dev");
-    vector <string> cameras;
+    vector<string> cameras;
 
     for (const auto &entry : fs::directory_iterator(device_dir)) {
         if (entry.path().string().find("video") != string::npos)
@@ -481,14 +481,18 @@ int main(int, char **) {
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Rows");
             ImGui::SameLine();
-            ImGui::PushItemWidth(48);
-            ImGui::InputInt("##chkbrd_rows", &chkbrd_rows, 0);
-            ImGui::SameLine();
+//            ImGui::PushItemWidth(48);
+            ImGui::InputInt("##chkbrd_rows", &chkbrd_rows, 1);
+//            ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
             ImGui::Text("Cols");
             ImGui::SameLine();
-            ImGui::InputInt("##chkbrd_cols", &chkbrd_cols, 0);
-            ImGui::PopItemWidth();
+            ImGui::InputInt("##chkbrd_cols", &chkbrd_cols, 1);
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Size in [m]");
+            ImGui::SameLine();
+            ImGui::InputFloat("##chkbrd_size", &chkbrd_size, 0.001f);
+//            ImGui::PopItemWidth();
 
             if (calibration_mode) {
                 if (stream_on) {
@@ -542,7 +546,6 @@ int main(int, char **) {
                 ImGui::NewLine();
 
                 ImGui::Separator();
-                ImGui::NewLine();
 
                 // Collect snapshot button
                 if (ImGui::Button("Snapshot") && corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
@@ -556,14 +559,12 @@ int main(int, char **) {
                 }
 
                 if (instances.size() > 0) {
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Collected Snapshots");
                     {
                         ImGui::ListBoxHeader("Snapshots", instances.size(), -1);
                         for (int i = 0; i < instances.size(); i++) {
                             bool is_selected = (i == snapshot_curr) ? true : false;
-                            double id = instances[i].id.tv_sec + (instances[i].id.tv_usec / 1e6);
-                            if (ImGui::Selectable(to_string(id).c_str(), is_selected)) {
+                            double stamp = instances[i].id.tv_sec + (instances[i].id.tv_usec / 1e6);
+                            if (ImGui::Selectable(to_string(stamp).c_str(), is_selected)) {
                                 if (is_selected)
                                     snapshot_curr = -1;
                                 else
@@ -571,7 +572,8 @@ int main(int, char **) {
                             }
                             if (ImGui::BeginPopupContextItem()) {
                                 if (ImGui::Selectable("Remove")) {
-                                    instances.erase(instances.begin() + snapshot_curr);
+                                    int id = i;
+                                    instances.erase(instances.begin() + id);
                                     snapshot_curr--;
                                 }
                                 ImGui::EndPopup();
@@ -580,6 +582,41 @@ int main(int, char **) {
                                 ImGui::SetItemDefaultFocus();
                         }
                         ImGui::ListBoxFooter();
+                    }
+                }
+
+                // Calibrate Using snapshots if enough (min is 4 to solve for 8 DOF)
+                if (instances.size() >= 4) {
+                    ImGui::Separator();
+                    if (ImGui::Button("Calibrate")) {
+                        // Initialize values
+                        vector<cv::Point3f> corners3d;
+                        for (int i = 0; i < chkbrd_rows - 1; ++i)
+                            for (int j = 0; j < chkbrd_cols - 1; ++j)
+                                corners3d.push_back(cv::Point3f(float(j * chkbrd_size), float(i * chkbrd_size), 0));
+
+                        vector<vector<cv::Point2f>> imgPoints;
+                        vector<vector<cv::Point3f>> objPoints;
+                        for (const auto &instance : instances) {
+                            imgPoints.push_back(instance.corners);
+                            objPoints.push_back(corners3d);
+                        }
+
+                        // Initialize camera matrix && dist coeff
+                        cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
+                        cv::Mat D = cv::Mat::zeros(8, 1, CV_64F);
+
+                        vector<cv::Mat> R, T;
+                        double rms = cv::calibrateCamera(objPoints, imgPoints, cv::Size(camera_width, camera_height),
+                                                         K, D, R, T, CV_CALIB_FIX_ASPECT_RATIO |
+                                                                     CV_CALIB_FIX_K4 |
+                                                                     CV_CALIB_FIX_K5 |
+                                                                     CV_CALIB_FIX_K6);
+
+                        cout << "Calibration Values: " << endl;
+                        cout << "K = " << K << endl;
+                        cout << "D = " << D << endl;
+                        cout << "RMS = " << rms << endl;
                     }
                 }
 
@@ -595,7 +632,8 @@ int main(int, char **) {
             }
 
             ImGui::NewLine();
-            ImGui::SetCursorPosY(ImGui::GetContentRegionMax().y - min(0.0f, ImGui::GetContentRegionAvail().y) - ImGui::GetFontSize() + ImGui::GetScrollY());
+            ImGui::SetCursorPosY(ImGui::GetContentRegionMax().y - min(0.0f, ImGui::GetContentRegionAvail().y) -
+                                 ImGui::GetFontSize() + ImGui::GetScrollY());
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                         ImGui::GetIO().Framerate);
             ImGui::End();
