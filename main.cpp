@@ -95,12 +95,13 @@ void CoveredBar(const float &start, const float &stop, const float &indicator = 
 
     float height = ImGui::GetFrameHeight() * 0.25f;
     float width = ImGui::GetContentRegionAvailWidth();
-    p.y += 0.25f * ImGui::GetFrameHeight();
+    p.y += 0.375f * ImGui::GetFrameHeight();
 
     draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height),
                              ImGui::GetColorU32(ImVec4(0.78f, 0.78f, 0.78f, 1.0f)), height * 0.5f);
     if (stop > start) {
-        draw_list->AddRectFilled(ImVec2(p.x + start * width, p.y), ImVec2(p.x + stop * width, p.y + height),
+        draw_list->AddRectFilled(ImVec2(p.x + max(0.0f, start) * width, p.y),
+                                 ImVec2(p.x + min(1.0f, stop) * width, p.y + height),
                                  ImGui::GetColorU32(ImVec4(0.56f, 0.83f, 0.26f, 1.0f)), height * 0.5f);
     }
 
@@ -108,6 +109,41 @@ void CoveredBar(const float &start, const float &stop, const float &indicator = 
         draw_list->AddCircleFilled(ImVec2(p.x + indicator * width, p.y + height / 2.0f), height,
                                    ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 
+}
+
+bool MaterialButton(const char *label, bool focus = false, const ImVec2 &size = ImVec2(0, 0)) {
+    // Get Position and Drawlist
+    ImVec2 p = ImGui::GetCursorScreenPos();
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+
+
+    // Draw button
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.56f, 0.83f, 0.26f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.48f, 0.75f, 0.18f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+    bool clicked = ImGui::Button(label, size);
+    float height = ImGui::GetItemRectSize().y;
+    float width = ImGui::GetItemRectSize().x;
+
+    ImGui::PopStyleColor(3);
+
+    // Draw rectangle if focused
+    if (focus) {
+        ImU32 col_bg;
+        ImGuiContext &g = *GImGui;
+        float padding = 1.0f;
+        float ANIM_SPEED = 0.32f;
+        float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
+        col_bg = ImGui::GetColorU32(ImLerp(ImVec4(0.56f, 0.83f, 0.26f, 1.0f), ImVec4(0.72f, 0.91f, 0.42f, 1.0f), t_anim));
+
+        draw_list->AddRect(ImVec2(p.x - padding, p.y - padding),
+                           ImVec2(p.x + width + padding, p.y + height + padding), col_bg,
+                           ImGui::GetStyle().FrameRounding,
+                           ImDrawCornerFlags_All, padding * 2);
+    }
+
+    return clicked;
 }
 
 // Main code
@@ -199,11 +235,11 @@ int main(int, char **) {
     colors[ImGuiCol_SliderGrab] = ImVec4(0.20f, 0.20f, 0.20f, 0.86f);
     colors[ImGuiCol_SliderGrabActive] = ImVec4(0.15f, 0.64f, 1.00f, 0.80f);
     colors[ImGuiCol_Button] = ImVec4(0.81f, 0.81f, 0.81f, 0.49f);
-    colors[ImGuiCol_ButtonHovered] = ImVec4(0.15f, 0.64f, 1.00f, 0.25f);
-    colors[ImGuiCol_ButtonActive] = ImVec4(0.15f, 0.64f, 1.00f, 0.80f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.56f, 0.83f, 0.26f, 1.0f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.64f, 0.83f, 0.34f, 1.0f);
     colors[ImGuiCol_Header] = ImVec4(0.81f, 0.81f, 0.81f, 0.49f);
-    colors[ImGuiCol_HeaderHovered] = ImVec4(0.15f, 0.64f, 1.00f, 0.25f);
-    colors[ImGuiCol_HeaderActive] = ImVec4(0.15f, 0.64f, 1.00f, 0.80f);
+    colors[ImGuiCol_HeaderHovered] = ImVec4(0.56f, 0.83f, 0.26f, 1.0f);
+    colors[ImGuiCol_HeaderActive] = ImVec4(0.72f, 0.83f, 0.42f, 1.0f);
     colors[ImGuiCol_Separator] = ImVec4(0.00f, 0.00f, 0.00f, 0.04f);
     colors[ImGuiCol_SeparatorHovered] = ImVec4(0.14f, 0.44f, 0.80f, 0.78f);
     colors[ImGuiCol_SeparatorActive] = ImVec4(0.14f, 0.44f, 0.80f, 1.00f);
@@ -388,7 +424,7 @@ int main(int, char **) {
             ImGui::SameLine();
             ImGui::InputInt("##height", &camera_height, 0);
             ImGui::SameLine(ImGui::GetWindowWidth() - 44);
-            if (ImGui::Button("Set")) {
+            if (MaterialButton("Set")) {
                 camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
                 camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
                 changed = true;
@@ -499,11 +535,14 @@ int main(int, char **) {
                     cv::Mat gray(img.rows, img.cols, CV_8UC1);
                     cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
                     cv::cvtColor(gray, img, cv::COLOR_GRAY2RGB);
+//                    cv::resize(gray, gray, cv::Size(gray.cols / 2, gray.rows / 2));
                     if (cv::findChessboardCorners(gray, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), corners,
                                                   CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE |
                                                   CV_CALIB_CB_FAST_CHECK)) {
                         cv::cornerSubPix(gray, corners, cv::Size(11, 11), cv::Size(-1, -1),
                                          cv::TermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 30, 0.1));
+//                        for (auto& c : corners)
+//                            c *= 2;
                         cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), cv::Mat(corners),
                                                   true);
                     }
@@ -548,7 +587,7 @@ int main(int, char **) {
                 ImGui::Separator();
 
                 // Collect snapshot button
-                if (ImGui::Button("Snapshot") && corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
+                if (MaterialButton("Snapshot") && corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
                     snapshot instance;
                     gettimeofday(&instance.id, NULL);
                     img.copyTo(instance.img);
@@ -557,6 +596,21 @@ int main(int, char **) {
                     instance.corners.assign(corners.begin(), corners.end());
                     instances.push_back(instance);
                 }
+                ImGui::SameLine();
+                {
+                    cv::Mat old_img(img);
+                    cv::Mat new_img;
+                    camera.grab();
+                    camera.retrieve(new_img);
+                    cv::cvtColor(old_img, old_img, cv::COLOR_RGB2GRAY);
+                    cv::cvtColor(new_img, new_img, cv::COLOR_RGB2GRAY);
+                    cv::Mat diff(old_img.rows, old_img.cols, CV_8UC1);
+                    cv::absdiff(old_img, new_img, diff);
+                    cv::Scalar mean_diff = cv::mean(diff);
+                    CoveredBar(0, (float) mean_diff.val[0] / 255.0f);
+                }
+
+                ImGui::NewLine();
 
                 if (instances.size() > 0) {
                     {
@@ -588,7 +642,7 @@ int main(int, char **) {
                 // Calibrate Using snapshots if enough (min is 4 to solve for 8 DOF)
                 if (instances.size() >= 4) {
                     ImGui::Separator();
-                    if (ImGui::Button("Calibrate")) {
+                    if (MaterialButton("Calibrate", true)) {
                         // Initialize values
                         vector<cv::Point3f> corners3d;
                         for (int i = 0; i < chkbrd_rows - 1; ++i)
