@@ -585,8 +585,15 @@ int main(int, char **) {
 
                     // Compare actual frame with previous frame for movement
                     cv::Rect rect = cv::minAreaRect(corners).boundingRect();
-                    cv::Mat old_img = img_prev(rect);
-                    cv::Mat new_img = img(rect);
+                    cv::Mat old_img;
+                    cv::Mat new_img;
+                    if (rect.x > 0 && rect.y > 0 && rect.x + rect.width < camera_width && rect.y + rect.height < camera_height) {
+                        old_img = img_prev(rect);
+                        new_img = img(rect);
+                    } else {
+                        img_prev.copyTo(old_img);
+                        img.copyTo(new_img);
+                    }
                     cv::cvtColor(old_img, old_img, cv::COLOR_RGB2GRAY);
                     cv::cvtColor(new_img, new_img, cv::COLOR_RGB2GRAY);
                     cv::Mat diff(old_img.rows, old_img.cols, CV_8UC1);
@@ -624,7 +631,7 @@ int main(int, char **) {
 
                 // List all snapshots
                 if (instances.size() > 0) {
-                    ImGui::ListBoxHeader("Snapshots", instances.size(), -1);
+                    ImGui::ListBoxHeader("Snapshots", instances.size(), (int) min(5.0f, (float) instances.size()));
                     for (int i = 0; i < instances.size(); i++) {
                         bool is_selected = (i == snapshot_curr) ? true : false;
                         double stamp = instances[i].id.tv_sec + (instances[i].id.tv_usec / 1e6);
@@ -668,14 +675,23 @@ int main(int, char **) {
                         rms = cv::calibrateCamera(objPoints, imgPoints, cv::Size(camera_width, camera_height),
                                                   K, D, R, T, CV_CALIB_FIX_ASPECT_RATIO |
                                                               CV_CALIB_FIX_K4 |
-                                                              CV_CALIB_FIX_K5 |
-                                                              CV_CALIB_FIX_K6);
+                                                              CV_CALIB_FIX_K5);
 
                         if (!calibrated)
                             calibrated = true;
                     }
 
                     if (calibrated) {
+                        if (MaterialButton("Export", calibrated)) {
+                            cv::FileStorage fs("calibration.yaml", cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
+                            fs << "image_width" << camera_width;
+                            fs << "image_height" << camera_height;
+                            fs << "camera_name" << cameras[camera_curr];
+                            fs << "camera_matrix" << K;
+                            fs << "distortion_model" << "plumb_bob";
+                            fs << "distortion_coefficients" << D;
+                            fs << "rectification_matrix" << cv::Mat::eye(3, 3, CV_64F);
+                        }
                         stringstream result_ss;
                         result_ss << "K = " << K << endl << endl;
                         result_ss << "D = " << D << endl << endl;
@@ -704,11 +720,11 @@ int main(int, char **) {
 
             ImGui::NewLine();
 
-            ImGui::SetCursorPosY(
-                    max(0.0f, (ImGui::GetContentRegionMax().y - min(0.0f, ImGui::GetContentRegionAvail().y) -
-                               ImGui::GetFontSize() + ImGui::GetScrollY())));
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                        ImGui::GetIO().Framerate);
+//            ImGui::SetCursorPosY(
+//                    max(0.0f, (ImGui::GetContentRegionMax().y - min(0.0f, ImGui::GetContentRegionAvail().y) -
+//                               ImGui::GetFontSize() + ImGui::GetScrollY())));
+//            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
+//                        ImGui::GetIO().Framerate);
             ImGui::End();
         }
 
