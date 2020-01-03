@@ -93,7 +93,7 @@ double computeReprojectionErrors(const vector<vector<cv::Point3f> > &objectPoint
 
 ImVec4 interp_color(const float &x, const float &lb, const float &ub) {
     float x_interp = (x - ub) / (lb - ub);
-    return ImVec4(x_interp, 1.0f - abs(2.0f * (x_interp - 0.5f)), 1.0f - x_interp, 1.0f);
+    return ImVec4(1.0f - x_interp, x_interp, 0.0f, 1.0f);
 }
 
 void ToggleButton(const char *str_id, bool *v) {
@@ -557,6 +557,7 @@ int main(int, char **) {
                 size_max = 0;
                 max_size = sqrt(size_min) * 0.9f;
                 instances.clear();
+                instance_errs.clear();
             } else if (!camera_on)
                 calibration_mode = false;
 
@@ -680,8 +681,10 @@ int main(int, char **) {
                             bool is_selected = i == snapshot_curr;
                             double stamp = instances[i].id.tv_sec + (instances[i].id.tv_usec / 1e6);
                             if (instance_errs.size() > i) {
-                                ImVec4 color = interp_color(instance_errs[i], 1.0f, 0.0f);
-                                color.w = 0.5f;
+                                ImVec4 color = interp_color(instance_errs[i], 0.0f, 1.0f);
+                                color.x *= 0.56f;
+                                color.y *= 0.83f;
+                                color.w *= 0.5f;
                                 ImDrawList *drawList = ImGui::GetWindowDrawList();
                                 ImVec2 s(ImGui::GetContentRegionAvailWidth(), ImGui::GetTextLineHeight() + 3);
                                 ImVec2 p = ImGui::GetCursorScreenPos();
@@ -747,7 +750,7 @@ int main(int, char **) {
                     if (calibrated) {
                         ImGui::SameLine();
                         if (MaterialButton("Export", calibrated)) {
-                            cv::FileStorage fs("~/calibration.yaml",
+                            cv::FileStorage fs("~/Desktop/calibration.yaml",
                                                cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
                             fs << "image_width" << camera_width;
                             fs << "image_height" << camera_height;
@@ -756,6 +759,7 @@ int main(int, char **) {
                             fs << "distortion_model" << "plumb_bob";
                             fs << "distortion_coefficients" << D;
                             fs << "rectification_matrix" << cv::Mat::eye(3, 3, CV_64F);
+                            fs << "projection_matrix" << K.mul(cv::Mat::eye(3, 4, CV_64F));
                         }
                         stringstream result_ss;
                         result_ss << "K = " << K << endl << endl;
@@ -764,7 +768,7 @@ int main(int, char **) {
                         char output[result.size() + 1];
                         strcpy(output, result.c_str());
                         ImGui::InputTextMultiline("##result", output, result.size(),
-                                                  ImVec2(0, ImGui::GetTextLineHeight() * 10),
+                                                  ImVec2(0, ImGui::GetTextLineHeight() * 11),
                                                   ImGuiInputTextFlags_ReadOnly);
                     }
                 }
