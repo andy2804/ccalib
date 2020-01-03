@@ -66,6 +66,36 @@ bool findCorners(cv::Mat &img, vector<cv::Point2f> &corners, const int &cols, co
     return false;
 }
 
+// As taken from opencv docs
+double computeReprojectionErrors(const vector<vector<cv::Point3f> > &objectPoints,
+                                 const vector<vector<cv::Point2f> > &imagePoints,
+                                 const vector<cv::Mat> &rvecs, const vector<cv::Mat> &tvecs,
+                                 const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs,
+                                 vector<float> &perViewErrors) {
+    vector<cv::Point2f> imagePoints2;
+    int i, totalPoints = 0;
+    double totalErr = 0, err;
+    perViewErrors.resize(objectPoints.size());
+
+    for (i = 0; i < (int) objectPoints.size(); ++i) {
+        projectPoints(cv::Mat(objectPoints[i]), rvecs[i], tvecs[i], cameraMatrix,  // project
+                      distCoeffs, imagePoints2);
+        err = norm(cv::Mat(imagePoints[i]), cv::Mat(imagePoints2), CV_L2);              // difference
+
+        int n = (int) objectPoints[i].size();
+        perViewErrors[i] = (float) std::sqrt(err * err / n);                        // save for this view
+        totalErr += err * err;                                             // sum it up
+        totalPoints += n;
+    }
+
+    return std::sqrt(totalErr / totalPoints);              // calculate the arithmetical mean
+}
+
+ImVec4 interp_color(const float &x, const float &lb, const float &ub) {
+    float x_interp = (x - ub) / (lb - ub);
+    return ImVec4(x_interp, 1.0f - abs(2.0f * (x_interp - 0.5f)), 1.0f - x_interp, 1.0f);
+}
+
 void ToggleButton(const char *str_id, bool *v) {
     ImVec2 p = ImGui::GetCursorScreenPos();
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
@@ -226,54 +256,54 @@ int main(int, char **) {
 
     // Set custom colors
     ImVec4 *colors = ImGui::GetStyle().Colors;
-    colors[ImGuiCol_Text]                   = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
-    colors[ImGuiCol_TextDisabled]           = ImVec4(0.78f, 0.78f, 0.78f, 1.00f);
-    colors[ImGuiCol_WindowBg]               = ImVec4(0.94f, 0.94f, 0.94f, 1.00f);
-    colors[ImGuiCol_ChildBg]                = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    colors[ImGuiCol_PopupBg]                = ImVec4(1.00f, 1.00f, 1.00f, 0.98f);
-    colors[ImGuiCol_Border]                 = ImVec4(0.16f, 0.16f, 0.16f, 0.03f);
-    colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    colors[ImGuiCol_FrameBg]                = ImVec4(1.00f, 1.00f, 1.00f, 0.53f);
-    colors[ImGuiCol_FrameBgHovered]         = ImVec4(1.00f, 1.00f, 1.00f, 0.87f);
-    colors[ImGuiCol_FrameBgActive]          = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
-    colors[ImGuiCol_TitleBg]                = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
-    colors[ImGuiCol_TitleBgActive]          = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
-    colors[ImGuiCol_TitleBgCollapsed]       = ImVec4(0.75f, 0.75f, 0.75f, 0.51f);
-    colors[ImGuiCol_MenuBarBg]              = ImVec4(0.86f, 0.86f, 0.86f, 1.00f);
-    colors[ImGuiCol_ScrollbarBg]            = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    colors[ImGuiCol_ScrollbarGrab]          = ImVec4(0.69f, 0.69f, 0.69f, 0.80f);
-    colors[ImGuiCol_ScrollbarGrabHovered]   = ImVec4(0.49f, 0.49f, 0.49f, 0.80f);
-    colors[ImGuiCol_ScrollbarGrabActive]    = ImVec4(0.49f, 0.49f, 0.49f, 1.00f);
-    colors[ImGuiCol_CheckMark]              = ImVec4(0.64f, 0.83f, 0.34f, 1.00f);
-    colors[ImGuiCol_SliderGrab]             = ImVec4(0.20f, 0.20f, 0.20f, 0.86f);
-    colors[ImGuiCol_SliderGrabActive]       = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
-    colors[ImGuiCol_Button]                 = ImVec4(0.81f, 0.81f, 0.81f, 0.39f);
-    colors[ImGuiCol_ButtonHovered]          = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
-    colors[ImGuiCol_ButtonActive]           = ImVec4(0.64f, 0.83f, 0.34f, 1.00f);
-    colors[ImGuiCol_Header]                 = ImVec4(1.00f, 1.00f, 1.00f, 0.49f);
-    colors[ImGuiCol_HeaderHovered]          = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
-    colors[ImGuiCol_HeaderActive]           = ImVec4(0.72f, 0.83f, 0.42f, 1.00f);
-    colors[ImGuiCol_Separator]              = ImVec4(0.00f, 0.00f, 0.00f, 0.04f);
-    colors[ImGuiCol_SeparatorHovered]       = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
-    colors[ImGuiCol_SeparatorActive]        = ImVec4(0.72f, 0.83f, 0.42f, 1.00f);
-    colors[ImGuiCol_ResizeGrip]             = ImVec4(0.80f, 0.80f, 0.80f, 0.56f);
-    colors[ImGuiCol_ResizeGripHovered]      = ImVec4(0.71f, 0.71f, 0.71f, 0.91f);
-    colors[ImGuiCol_ResizeGripActive]       = ImVec4(0.00f, 0.00f, 0.00f, 0.95f);
-    colors[ImGuiCol_Tab]                    = ImVec4(0.81f, 0.81f, 0.81f, 0.49f);
-    colors[ImGuiCol_TabHovered]             = ImVec4(0.64f, 0.83f, 0.34f, 1.00f);
-    colors[ImGuiCol_TabActive]              = ImVec4(0.72f, 0.83f, 0.42f, 1.00f);
-    colors[ImGuiCol_TabUnfocused]           = ImVec4(0.92f, 0.93f, 0.94f, 0.99f);
-    colors[ImGuiCol_TabUnfocusedActive]     = ImVec4(0.74f, 0.83f, 0.50f, 0.79f);
-    colors[ImGuiCol_PlotLines]              = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
-    colors[ImGuiCol_PlotLinesHovered]       = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
-    colors[ImGuiCol_PlotHistogram]          = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
-    colors[ImGuiCol_PlotHistogramHovered]   = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
-    colors[ImGuiCol_TextSelectedBg]         = ImVec4(0.75f, 0.83f, 0.50f, 0.79f);
-    colors[ImGuiCol_DragDropTarget]         = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
-    colors[ImGuiCol_NavHighlight]           = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
-    colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(0.70f, 0.70f, 0.70f, 0.70f);
-    colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.20f, 0.20f, 0.20f, 0.20f);
-    colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
+    colors[ImGuiCol_Text] = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_TextDisabled] = ImVec4(0.78f, 0.78f, 0.78f, 1.00f);
+    colors[ImGuiCol_WindowBg] = ImVec4(0.94f, 0.94f, 0.94f, 1.00f);
+    colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_PopupBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.98f);
+    colors[ImGuiCol_Border] = ImVec4(0.16f, 0.16f, 0.16f, 0.03f);
+    colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_FrameBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.53f);
+    colors[ImGuiCol_FrameBgHovered] = ImVec4(1.00f, 1.00f, 1.00f, 0.87f);
+    colors[ImGuiCol_FrameBgActive] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_TitleBg] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+    colors[ImGuiCol_TitleBgActive] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.75f, 0.75f, 0.75f, 0.51f);
+    colors[ImGuiCol_MenuBarBg] = ImVec4(0.86f, 0.86f, 0.86f, 1.00f);
+    colors[ImGuiCol_ScrollbarBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.69f, 0.69f, 0.69f, 0.80f);
+    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.49f, 0.49f, 0.49f, 0.80f);
+    colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.49f, 0.49f, 0.49f, 1.00f);
+    colors[ImGuiCol_CheckMark] = ImVec4(0.64f, 0.83f, 0.34f, 1.00f);
+    colors[ImGuiCol_SliderGrab] = ImVec4(0.20f, 0.20f, 0.20f, 0.86f);
+    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
+    colors[ImGuiCol_Button] = ImVec4(0.81f, 0.81f, 0.81f, 0.39f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.64f, 0.83f, 0.34f, 1.00f);
+    colors[ImGuiCol_Header] = ImVec4(0.56f, 0.83f, 0.26f, 0.49f);
+    colors[ImGuiCol_HeaderHovered] = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
+    colors[ImGuiCol_HeaderActive] = ImVec4(0.72f, 0.83f, 0.42f, 1.00f);
+    colors[ImGuiCol_Separator] = ImVec4(0.00f, 0.00f, 0.00f, 0.04f);
+    colors[ImGuiCol_SeparatorHovered] = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
+    colors[ImGuiCol_SeparatorActive] = ImVec4(0.72f, 0.83f, 0.42f, 1.00f);
+    colors[ImGuiCol_ResizeGrip] = ImVec4(0.80f, 0.80f, 0.80f, 0.56f);
+    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.71f, 0.71f, 0.71f, 0.91f);
+    colors[ImGuiCol_ResizeGripActive] = ImVec4(0.00f, 0.00f, 0.00f, 0.95f);
+    colors[ImGuiCol_Tab] = ImVec4(0.81f, 0.81f, 0.81f, 0.49f);
+    colors[ImGuiCol_TabHovered] = ImVec4(0.64f, 0.83f, 0.34f, 1.00f);
+    colors[ImGuiCol_TabActive] = ImVec4(0.72f, 0.83f, 0.42f, 1.00f);
+    colors[ImGuiCol_TabUnfocused] = ImVec4(0.92f, 0.93f, 0.94f, 0.99f);
+    colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.74f, 0.83f, 0.50f, 0.79f);
+    colors[ImGuiCol_PlotLines] = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
+    colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_PlotHistogram] = ImVec4(1.00f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.70f, 0.00f, 0.50f);
+    colors[ImGuiCol_TextSelectedBg] = ImVec4(0.75f, 0.83f, 0.50f, 0.79f);
+    colors[ImGuiCol_DragDropTarget] = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
+    colors[ImGuiCol_NavHighlight] = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
+    colors[ImGuiCol_NavWindowingHighlight] = ImVec4(0.70f, 0.70f, 0.70f, 0.70f);
+    colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.20f, 0.20f, 0.20f, 0.20f);
+    colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
 
     // Setup Platform/Renderer bindings
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
@@ -318,10 +348,10 @@ int main(int, char **) {
     cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
     cv::Mat D = cv::Mat::zeros(8, 1, CV_64F);
     vector<cv::Mat> R, T;
-    double rms;
-
+    double reprojection_err = DBL_MAX;
     int snapshot_curr = -1;
     vector<snapshot> instances;
+    vector<float> instance_errs;
 
     cv::Point2f mean(camera_width / 2, camera_height / 2);
     float size = max_size / 2;
@@ -371,6 +401,7 @@ int main(int, char **) {
 
         // Show parameters window
         {
+            // TODO Collapsable UI --> more organized
             // Set next window size & pos
             ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
             ImGui::SetNextWindowSize(ImVec2(width_parameter_window, io.DisplaySize.y), ImGuiCond_Always);
@@ -382,7 +413,7 @@ int main(int, char **) {
             // Camera selector
             ImGui::AlignTextToFramePadding();
             ImGui::PushItemWidth(-1);
-            ImGui::Text("Select Device");
+            ImGui::Text("Select Camera");
             ImGui::SameLine(spacing);
             if (ImGui::BeginCombo("##camera_selector", cameras[camera_curr].c_str(), 0)) {
                 for (int i = 0; i < cameras.size(); i++) {
@@ -416,6 +447,18 @@ int main(int, char **) {
             } else if (!camera_on) {
                 camera.release();
                 stream_on = false;
+            }
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Flip Image");
+            ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
+            ToggleButton("##flip_toggle", &flip_img);
+
+            if (calibrated) {
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Undistort Image");
+                ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
+                ToggleButton("##undistort_toggle", &undistort);
             }
 
             ImGui::Separator();
@@ -477,19 +520,6 @@ int main(int, char **) {
                 }
                 ImGui::EndCombo();
                 changed = true;
-            }
-
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Flip Image");
-            ImGui::SameLine();
-            ImGui::Checkbox("##flip", &flip_img);
-
-            if (calibrated) {
-                ImGui::SameLine();
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Undistort Image");
-                ImGui::SameLine();
-                ImGui::Checkbox("##undistort", &undistort);
             }
 
             if (changed && camera_on) {
@@ -586,6 +616,7 @@ int main(int, char **) {
                 ImGui::Separator();
 
                 // Collect snapshot button
+                // TODO automatic collection of snapshots
                 if (MaterialButton("Snapshot", !calibrated && instances.size() < 4) &&
                     corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1)) && stream_on)
                     taking_snapshot = true;
@@ -598,7 +629,8 @@ int main(int, char **) {
                     cv::Rect rect = cv::minAreaRect(corners).boundingRect();
                     cv::Mat old_img;
                     cv::Mat new_img;
-                    if (rect.x > 0 && rect.y > 0 && rect.x + rect.width < camera_width && rect.y + rect.height < camera_height) {
+                    if (rect.x > 0 && rect.y > 0 && rect.x + rect.width < camera_width &&
+                        rect.y + rect.height < camera_height) {
                         old_img = img_prev(rect);
                         new_img = img(rect);
                     } else {
@@ -613,7 +645,7 @@ int main(int, char **) {
                     CoveredBar(0.0f, 1.0f - (float) mean_diff.val[0] / 127.0f);
 
                     // If successful, add instance
-                    if (mean_diff.val[0] < 3) {
+                    if (mean_diff.val[0] < 4) {
                         snapshot instance;
                         gettimeofday(&instance.id, NULL);
                         img.copyTo(instance.img);
@@ -641,21 +673,37 @@ int main(int, char **) {
                 }
 
                 // List all snapshots
+                // TODO progress bar of how many snapshots need to be taken
                 if (instances.size() > 0) {
-                    if (ImGui::ListBoxHeader("Snapshots", (int) instances.size(), (int) min(5.0f, (float) instances.size()))) {
+                    if (ImGui::ListBoxHeader("Snapshots", (int) instances.size(), -1)) {
                         for (int i = 0; i < instances.size(); i++) {
                             bool is_selected = i == snapshot_curr;
                             double stamp = instances[i].id.tv_sec + (instances[i].id.tv_usec / 1e6);
+                            if (instance_errs.size() > i) {
+                                ImVec4 color = interp_color(instance_errs[i], 1.0f, 0.0f);
+                                color.w = 0.5f;
+                                ImDrawList *drawList = ImGui::GetWindowDrawList();
+                                ImVec2 s(ImGui::GetContentRegionAvailWidth(), ImGui::GetTextLineHeight() + 3);
+                                ImVec2 p = ImGui::GetCursorScreenPos();
+//                                ImVec2 m = ImGui::GetStyle().ItemInnerSpacing;
+//                                p.x += m.x / 2;
+//                                p.y += m.y / 2;
+                                drawList->AddRectFilled(ImVec2(p.x - 3, p.y - 4), ImVec2(p.x + s.x + 3, p.y + s.y),
+                                                        ImGui::GetColorU32(color), 4.0f);
+                            }
                             if (ImGui::Selectable(to_string(stamp).c_str(), is_selected)) {
-                                if (is_selected)
+                                if (is_selected) {
                                     snapshot_curr = -1;
-                                else
+                                } else {
                                     snapshot_curr = i;
+                                }
                             }
                             if (ImGui::BeginPopupContextItem()) {
                                 if (ImGui::Selectable("Remove")) {
                                     int id = i;
                                     instances.erase(instances.begin() + id);
+//                                    if (id < instance_errs.size())
+//                                        instance_errs.erase(instance_errs.begin() + id);
                                     snapshot_curr--;
                                 }
                                 ImGui::EndPopup();
@@ -670,8 +718,9 @@ int main(int, char **) {
                 // Calibrate Using snapshots if enough (min is 4 to solve for 8 DOF)
                 if (instances.size() >= 4) {
                     ImGui::Separator();
-                    if (MaterialButton("Calibrate", !calibrated)) {
+                    if (MaterialButton("Calibrate", !calibrated) || instances.size() != instance_errs.size()) {
                         // Initialize values
+                        undistort = false;
                         vector<cv::Point3f> corners3d;
                         for (int i = 0; i < chkbrd_rows - 1; ++i)
                             for (int j = 0; j < chkbrd_cols - 1; ++j)
@@ -684,10 +733,12 @@ int main(int, char **) {
                             objPoints.push_back(corners3d);
                         }
 
-                        rms = cv::calibrateCamera(objPoints, imgPoints, cv::Size(camera_width, camera_height),
-                                                  K, D, R, T, CV_CALIB_FIX_ASPECT_RATIO |
-                                                              CV_CALIB_FIX_K4 |
-                                                              CV_CALIB_FIX_K5);
+                        cv::calibrateCamera(objPoints, imgPoints, cv::Size(camera_width, camera_height),
+                                            K, D, R, T, CV_CALIB_FIX_ASPECT_RATIO |
+                                                        CV_CALIB_FIX_K4 |
+                                                        CV_CALIB_FIX_K5);
+
+                        reprojection_err = computeReprojectionErrors(objPoints, imgPoints, R, T, K, D, instance_errs);
 
                         if (!calibrated)
                             calibrated = true;
@@ -696,7 +747,8 @@ int main(int, char **) {
                     if (calibrated) {
                         ImGui::SameLine();
                         if (MaterialButton("Export", calibrated)) {
-                            cv::FileStorage fs("calibration.yaml", cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
+                            cv::FileStorage fs("~/calibration.yaml",
+                                               cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
                             fs << "image_width" << camera_width;
                             fs << "image_height" << camera_height;
                             fs << "camera_name" << cameras[camera_curr];
@@ -707,13 +759,12 @@ int main(int, char **) {
                         }
                         stringstream result_ss;
                         result_ss << "K = " << K << endl << endl;
-                        result_ss << "D = " << D << endl << endl;
-                        result_ss << "RMS = " << rms;
+                        result_ss << "D = " << D;
                         string result = result_ss.str();
                         char output[result.size() + 1];
                         strcpy(output, result.c_str());
                         ImGui::InputTextMultiline("##result", output, result.size(),
-                                                  ImVec2(0, ImGui::GetTextLineHeight() * 11),
+                                                  ImVec2(0, ImGui::GetTextLineHeight() * 10),
                                                   ImGuiInputTextFlags_ReadOnly);
                     }
                 }
@@ -743,8 +794,6 @@ int main(int, char **) {
 
         // Show image preview
         {
-            // TODO Only render if active camera connection
-
             // Set next window size & pos
             ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
             ImGui::SetNextWindowPos(ImVec2(width_parameter_window, 0), ImGuiCond_Once);
@@ -753,7 +802,7 @@ int main(int, char **) {
 
             ImGui::Begin("Preview", nullptr,
                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
-                         ImGuiWindowFlags_NoScrollbar);
+                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
             if (camera_on) {
                 if (stream_on) {
@@ -779,9 +828,20 @@ int main(int, char **) {
                                cv::Size((int) (ImGui::GetWindowHeight() * img_ratio), (int) ImGui::GetWindowHeight()));
             }
 
-            ImGui::SetCursorPos(
-                    ImVec2((ImGui::GetWindowWidth() - img.cols) / 2, (ImGui::GetWindowHeight() - img.rows) / 2));
+            ImVec2 pos = ImVec2((ImGui::GetWindowWidth() - img.cols) / 2,
+                                (ImGui::GetWindowHeight() - img.rows) / 2 + ImGui::GetFrameHeight());
+            ImGui::SetCursorPos(pos);
             ImGui::Image((void *) (intptr_t) texture, ImVec2(img.cols, img.rows));
+
+            if (reprojection_err != DBL_MAX) {
+                string reproj_error;
+                if (snapshot_curr == -1)
+                    reproj_error = "Mean Reprojection Error: " + to_string(reprojection_err);
+                else
+                    reproj_error = "Reprojection Error: " + to_string(instance_errs[snapshot_curr]);
+                ImGui::SetCursorPos(ImVec2(pos.x + 16, pos.y + 16));
+                ImGui::TextColored(ImColor(255, 255, 255, 255), reproj_error.c_str());
+            }
 
             ImGui::End();
             ImGui::PopStyleColor(1);
