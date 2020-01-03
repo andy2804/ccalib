@@ -1,3 +1,7 @@
+//
+// Created by andy2804 on 19.12.19.
+//
+
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl.h"
 #include "imgui/imgui_impl_opengl3.h"
@@ -650,8 +654,6 @@ int main(int, char **) {
                         snapshot instance;
                         gettimeofday(&instance.id, NULL);
                         img.copyTo(instance.img);
-                        if (flip_img)
-                            cv::flip(instance.img, instance.img, 1);
                         instance.corners.assign(corners.begin(), corners.end());
                         instances.push_back(instance);
 
@@ -721,9 +723,8 @@ int main(int, char **) {
                 // Calibrate Using snapshots if enough (min is 4 to solve for 8 DOF)
                 if (instances.size() >= 4) {
                     ImGui::Separator();
-                    if (MaterialButton("Calibrate", !calibrated) || instances.size() != instance_errs.size()) {
+                    if (MaterialButton("Re-Calibrate", false) || instances.size() != instance_errs.size()) {
                         // Initialize values
-                        undistort = false;
                         vector<cv::Point3f> corners3d;
                         for (int i = 0; i < chkbrd_rows - 1; ++i)
                             for (int j = 0; j < chkbrd_cols - 1; ++j)
@@ -745,6 +746,7 @@ int main(int, char **) {
 
                         if (!calibrated)
                             calibrated = true;
+                        undistort = true;
                     }
 
                     if (calibrated) {
