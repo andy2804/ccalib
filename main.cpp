@@ -95,6 +95,35 @@ double computeReprojectionErrors(const vector<vector<cv::Point3f> > &objectPoint
     return std::sqrt(totalErr / totalPoints);              // calculate the arithmetical mean
 }
 
+bool calibrateCamera(const int &chkbrd_rows, const int &chkbrd_cols, const float &chkbrd_size,
+                     vector<snapshot> instances, const vector<cv::Mat> &R, const vector<cv::Mat> &T,
+                     const cv::Mat &K, const cv::Mat &D, vector<float> &instance_errs, double &reprojection_err) {
+    // Initialize values
+    vector<cv::Point3f> corners3d;
+    for (int i = 0; i < chkbrd_rows - 1; ++i)
+        for (int j = 0; j < chkbrd_cols - 1; ++j)
+            corners3d.push_back(
+                    cv::Point3f(float(j * chkbrd_size), float(i * chkbrd_size), 0));
+
+    vector<vector<cv::Point2f>> imgPoints;
+    vector<vector<cv::Point3f>> objPoints;
+    for (const auto &instance : instances) {
+        imgPoints.push_back(instance.corners);
+        objPoints.push_back(corners3d);
+    }
+
+    const int camera_width = instances[0].img.cols;
+    const int camera_height = instances[0].img.rows;
+
+    cv::calibrateCamera(objPoints, imgPoints, cv::Size(camera_width, camera_height),
+                        K, D, R, T, CV_CALIB_FIX_ASPECT_RATIO |
+                                    CV_CALIB_FIX_K4 |
+                                    CV_CALIB_FIX_K5);
+
+    reprojection_err = computeReprojectionErrors(objPoints, imgPoints, R, T, K, D, instance_errs);
+    return reprojection_err <= 0.3 ? true : false;
+}
+
 ImVec4 interp_color(const float &x, const float &lb, const float &ub) {
     float x_interp = (x - ub) / (lb - ub);
     return ImVec4(1.0f - x_interp, x_interp, 0.0f, 1.0f);
@@ -193,6 +222,90 @@ bool MaterialButton(const char *label, bool focus = false, const ImVec2 &size = 
     return clicked;
 }
 
+bool BeginCard(const char *label, ImFont *title_font, const float &item_height, bool &visible) {
+    ImGuiWindow *window = ImGui::GetCurrentWindow();
+    if (window->SkipItems)
+        return false;
+
+    ImGuiContext &g = *GImGui;
+    const ImGuiStyle &style = g.Style;
+    const ImGuiID id = ImGui::GetID(label);
+    ImVec2 item_size = ImVec2(ImGui::GetContentRegionAvailWidth(),
+                              ImGui::GetFrameHeightWithSpacing() * item_height);
+    ImVec2 label_size = title_font->CalcTextSizeA(title_font->FontSize, FLT_MAX, -1.0f, label);
+    label_size.x = item_size.x;
+    label_size.y += style.ItemSpacing.y * 2;
+
+    float t = visible ? 1.0f : 0.0f;
+    float ANIM_SPEED = 0.16f;
+    if (g.LastActiveId == id) {
+        float t_anim = g.LastActiveIdTimer / ANIM_SPEED;
+        if (t_anim > 1.0f) {
+            ImGui::ClearActiveID();
+            t_anim = 1.0f;
+        }
+        t = visible ? (t_anim) : (1.0f - t_anim);
+    }
+    item_size = ImLerp(label_size, item_size, t);
+
+    // Size default to hold ~7 items. Fractional number of items helps seeing that we can scroll down/up without looking at scrollbar.
+    ImVec2 size = ImGui::CalcItemSize(item_size, ImGui::CalcItemWidth(),
+                                      ImGui::GetTextLineHeightWithSpacing() * 7.4f + style.ItemSpacing.y);
+    ImRect frame_bb(window->DC.CursorPos, ImVec2(window->DC.CursorPos.x + size.x, window->DC.CursorPos.y + size.y));
+    ImRect bb(frame_bb.Min, frame_bb.Max);
+    window->DC.LastItemRect = bb; // Forward storage for ListBoxFooter.. dodgy.
+    g.NextItemData.ClearFlags();
+
+    if (!ImGui::IsRectVisible(bb.Min, bb.Max)) {
+        ImGui::ItemSize(bb.GetSize(), style.FramePadding.y);
+        ImGui::ItemAdd(bb, 0, &frame_bb);
+        return false;
+    }
+
+    const ImVec2 p = ImGui::GetCursorPos();
+    ImGui::InvisibleButton(label, label_size);
+    if (ImGui::IsItemClicked()) {
+        ImGui::SetActiveID(id, window);
+        visible = !visible;
+    }
+    ImU32 col_bg = ImGui::GetColorU32(ImGuiCol_ChildBg, max(0.5f, t));
+//    ImU32 col_bg = ImGui::GetColorU32(
+//            ImLerp(ImGui::GetStyleColorVec4(ImGuiCol_Header), ImGui::GetStyleColorVec4(ImGuiCol_ChildBg), t));
+    if (ImGui::IsItemHovered() && !visible && t == 0.0f) {
+        col_bg = ImGui::GetColorU32(ImGuiCol_ChildBg);
+    }
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::GetWindowDrawList()->AddRectFilled(bb.Min, bb.Max, col_bg, style.ChildRounding);
+
+    ImGui::SetCursorPos(p);
+    ImGui::BeginChild(id, frame_bb.GetSize(), true, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
+    ImGui::PushFont(title_font);
+    ImGui::Text(label);
+
+    ImGui::PushItemWidth(-1);
+
+    ImGui::PopFont();
+    ImGui::Separator();
+    return true;
+}
+
+void EndCard() {
+    ImGuiWindow *parent_window = ImGui::GetCurrentWindow()->ParentWindow;
+    const ImRect bb = parent_window->DC.LastItemRect;
+    const ImGuiStyle &style = ImGui::GetStyle();
+
+    ImGui::PopItemWidth();
+
+    ImGui::EndChild();
+    ImGui::PopStyleColor(1);
+
+    // Redeclare item size so that it includes the label (we have stored the full size in LastItemRect)
+    // We call SameLine() to restore DC.CurrentLine* data
+    ImGui::SameLine();
+    parent_window->DC.CursorPos = bb.Min;
+    ImGui::ItemSize(bb, style.FramePadding.y);
+}
+
 // Main code
 int main(int, char **) {
     // Setup SDL
@@ -245,30 +358,33 @@ int main(int, char **) {
     ImGuiStyle &style = ImGui::GetStyle();
     style.WindowTitleAlign = ImVec2(0.5, 0.5);
     style.WindowRounding = 0;
+    style.ChildRounding = 5;
     style.FrameRounding = 5;
     style.GrabRounding = 5;
     style.PopupRounding = 5;
+    style.TabRounding = 5;
     style.ScrollbarRounding = 8;
     style.WindowBorderSize = 1;
     style.WindowPadding = ImVec2(8, 8);
     style.FramePadding = ImVec2(8, 6);
     style.FrameBorderSize = 1;
+    style.TabBorderSize = 1;
     style.ItemSpacing = ImVec2(8, 8);
     style.ItemInnerSpacing = ImVec2(8, 8);
-    style.GrabMinSize = 4;
+    style.GrabMinSize = 3;
     style.ScrollbarSize = 10;
 
     // Set custom colors
     ImVec4 *colors = ImGui::GetStyle().Colors;
     colors[ImGuiCol_Text] = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
     colors[ImGuiCol_TextDisabled] = ImVec4(0.78f, 0.78f, 0.78f, 1.00f);
-    colors[ImGuiCol_WindowBg] = ImVec4(0.94f, 0.94f, 0.94f, 1.00f);
-    colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_WindowBg] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+    colors[ImGuiCol_ChildBg] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
     colors[ImGuiCol_PopupBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.98f);
-    colors[ImGuiCol_Border] = ImVec4(0.16f, 0.16f, 0.16f, 0.03f);
+    colors[ImGuiCol_Border] = ImVec4(0.16f, 0.16f, 0.16f, 0.06f);
     colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    colors[ImGuiCol_FrameBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.53f);
-    colors[ImGuiCol_FrameBgHovered] = ImVec4(1.00f, 1.00f, 1.00f, 0.87f);
+    colors[ImGuiCol_FrameBg] = ImVec4(0.94f, 0.94f, 0.94f, 0.31f);
+    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.94f, 0.94f, 0.94f, 0.31f);
     colors[ImGuiCol_FrameBgActive] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
     colors[ImGuiCol_TitleBg] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
     colors[ImGuiCol_TitleBgActive] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
@@ -281,12 +397,12 @@ int main(int, char **) {
     colors[ImGuiCol_CheckMark] = ImVec4(0.64f, 0.83f, 0.34f, 1.00f);
     colors[ImGuiCol_SliderGrab] = ImVec4(0.20f, 0.20f, 0.20f, 0.86f);
     colors[ImGuiCol_SliderGrabActive] = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
-    colors[ImGuiCol_Button] = ImVec4(0.81f, 0.81f, 0.81f, 0.39f);
-    colors[ImGuiCol_ButtonHovered] = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
-    colors[ImGuiCol_ButtonActive] = ImVec4(0.64f, 0.83f, 0.34f, 1.00f);
-    colors[ImGuiCol_Header] = ImVec4(0.56f, 0.83f, 0.26f, 0.49f);
-    colors[ImGuiCol_HeaderHovered] = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
-    colors[ImGuiCol_HeaderActive] = ImVec4(0.72f, 0.83f, 0.42f, 1.00f);
+    colors[ImGuiCol_Button] = ImVec4(0.81f, 0.81f, 0.81f, 0.31f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.94f, 0.94f, 0.94f, 0.31f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.56f, 0.83f, 0.26f, 0.49f);
+    colors[ImGuiCol_Header] = ImVec4(0.86f, 0.86f, 0.86f, 0.31f);
+    colors[ImGuiCol_HeaderHovered] = ImVec4(0.56f, 0.83f, 0.26f, 0.49f);
+    colors[ImGuiCol_HeaderActive] = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
     colors[ImGuiCol_Separator] = ImVec4(0.00f, 0.00f, 0.00f, 0.04f);
     colors[ImGuiCol_SeparatorHovered] = ImVec4(0.56f, 0.83f, 0.26f, 1.00f);
     colors[ImGuiCol_SeparatorActive] = ImVec4(0.72f, 0.83f, 0.42f, 1.00f);
@@ -294,8 +410,8 @@ int main(int, char **) {
     colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.71f, 0.71f, 0.71f, 0.91f);
     colors[ImGuiCol_ResizeGripActive] = ImVec4(0.00f, 0.00f, 0.00f, 0.95f);
     colors[ImGuiCol_Tab] = ImVec4(0.81f, 0.81f, 0.81f, 0.49f);
-    colors[ImGuiCol_TabHovered] = ImVec4(0.64f, 0.83f, 0.34f, 1.00f);
-    colors[ImGuiCol_TabActive] = ImVec4(0.72f, 0.83f, 0.42f, 1.00f);
+    colors[ImGuiCol_TabHovered] = ImVec4(1.00f, 1.00f, 1.00f, 0.49f);
+    colors[ImGuiCol_TabActive] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
     colors[ImGuiCol_TabUnfocused] = ImVec4(0.92f, 0.93f, 0.94f, 0.99f);
     colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.74f, 0.83f, 0.50f, 0.79f);
     colors[ImGuiCol_PlotLines] = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
@@ -314,10 +430,17 @@ int main(int, char **) {
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Load Fonts
-    io.Fonts->AddFontFromFileTTF("../resources/Roboto-Regular.ttf", 16.0f);
+    ImFont *font_normal = io.Fonts->AddFontFromFileTTF("../resources/Roboto-Regular.ttf", 16.0f);
+    ImFont *font_title = io.Fonts->AddFontFromFileTTF("../resources/Roboto-Medium.ttf", 24.0f);
 
     // State variables
     bool show_demo_window = false;
+    bool show_camera_card = true;
+    bool show_parameters_card = false;
+    bool show_calibration_card = false;
+    bool show_coverage_card = true;
+    bool show_snapshots_card = true;
+    bool show_result_card = true;
     bool calibration_mode = false;
     bool camera_on = false;
     bool stream_on = false;
@@ -361,8 +484,8 @@ int main(int, char **) {
     float size = max_size / 2;
 
     float img_ratio = (float) camera_width / (float) camera_height;
-    int width_parameter_window = 320;
-    float spacing = width_parameter_window / 2;
+    int width_parameter_window = 350;
+    float spacing = (width_parameter_window - ImGui::GetStyle().WindowPadding.x * 2) / 2;
     vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
     vector<string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
     vector<cv::Point2f> corners;
@@ -410,370 +533,410 @@ int main(int, char **) {
             ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
             ImGui::SetNextWindowSize(ImVec2(width_parameter_window, io.DisplaySize.y), ImGuiCond_Always);
 
-            ImGui::Begin("Parameters", nullptr,
+            ImGui::Begin("Settings", nullptr,
                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
-                         ImGuiWindowFlags_NoScrollbar);
-
-            // Camera selector
-            ImGui::AlignTextToFramePadding();
+                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoTitleBar);
             ImGui::PushItemWidth(-1);
-            ImGui::Text("Select Camera");
-            ImGui::SameLine(spacing);
-            if (ImGui::BeginCombo("##camera_selector", cameras[camera_curr].c_str(), 0)) {
-                for (int i = 0; i < cameras.size(); i++) {
-                    bool is_selected = (cameras[camera_curr] == cameras[i]);
-                    if (ImGui::Selectable(cameras[i].c_str(), is_selected))
-                        camera_curr = i;
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
-                }
-                ImGui::EndCombo();
-            }
 
-            // Camera Controls
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Camera");
-            ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-            ToggleButton("##cam_toggle", &camera_on);
-            if (camera_on && ImGui::IsItemClicked(0)) {
-                camera.open(camera_curr);
-                camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
-                camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
-                camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
+            // Organize into 3 tabs (Parameters, Calibration Procedure, Results)
+            if (ImGui::BeginTabBar("##tabBar", ImGuiTabBarFlags_None)) {
 
-                camera.set(CV_CAP_PROP_AUTO_EXPOSURE, 0.25);
-                camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure);
-                camera.grab();
-                camera.retrieve(img);
+                // ==========================================
+                // Camera Settings and Calibration Parameters
+                // ==========================================
 
-                stream_on = true;
-                changed = true;
-            } else if (!camera_on) {
-                camera.release();
-                stream_on = false;
-            }
+                if (ImGui::BeginTabItem("Parameters")) {
+                    // Camera Card
+                    if (BeginCard("Camera", font_title, 4.5 + calibrated, show_camera_card)) {
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Device");
+                        ImGui::SameLine(spacing);
 
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Flip Image");
-            ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-            ToggleButton("##flip_toggle", &flip_img);
+                        if (ImGui::BeginCombo("##camera_selector", cameras[camera_curr].c_str(), 0)) {
+                            for (int i = 0; i < cameras.size(); i++) {
+                                bool is_selected = (cameras[camera_curr] == cameras[i]);
+                                if (ImGui::Selectable(cameras[i].c_str(), is_selected)) {
+                                    camera_curr = i;
+                                }
+                                if (is_selected) {
+                                    ImGui::SetItemDefaultFocus();
+                                }   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+                            }
+                            ImGui::EndCombo();
+                        }
 
-            if (calibrated) {
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Undistort Image");
-                ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-                ToggleButton("##undistort_toggle", &undistort);
-            }
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Stream");
+                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
+                        ToggleButton("##cam_toggle", &camera_on);
+                        if (camera_on && ImGui::IsItemClicked(0)) {
+                            camera.open(camera_curr);
+                            camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
+                            camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
+                            camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
 
-            ImGui::Separator();
+                            camera.set(CV_CAP_PROP_AUTO_EXPOSURE, 0.25);
+                            camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure);
+                            camera.grab();
+                            camera.retrieve(img);
 
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Resolution");
-            ImGui::SameLine(spacing);
-            ImGui::PushItemWidth(44);
-            ImGui::InputInt("##width", &camera_width, 0);
-            ImGui::SameLine();
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("x");
-            ImGui::SameLine();
-            ImGui::InputInt("##height", &camera_height, 0);
-            ImGui::SameLine(ImGui::GetWindowWidth() - 44);
-            if (MaterialButton("Set")) {
-                camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
-                camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
-                changed = true;
-            }
-            ImGui::PopItemWidth();
+                            stream_on = true;
+                            changed = true;
+                        } else if (!camera_on) {
+                            camera.release();
+                            stream_on = false;
+                        }
 
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Framerate");
-            ImGui::SameLine(spacing);
-            if (ImGui::BeginCombo("##camera_fps", to_string(camera_fps[camera_currfps]).c_str(), 0)) {
-                for (int i = 0; i < camera_fps.size(); i++) {
-                    bool is_selected = (camera_fps[camera_currfps] == camera_fps[i]);
-                    if (ImGui::Selectable(to_string(camera_fps[i]).c_str(), is_selected)) {
-                        camera_currfps = i;
-                        camera.set(CV_CAP_PROP_FPS, (double) camera_fps[camera_currfps]);
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Flip Image");
+                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
+                        ToggleButton("##flip_toggle", &flip_img);
+
+                        if (calibrated) {
+                            ImGui::AlignTextToFramePadding();
+                            ImGui::Text("Undistort Image");
+                            ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
+                            ToggleButton("##undistort_toggle", &undistort);
+                        }
+
+                        EndCard();
                     }
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
-                }
-                ImGui::EndCombo();
-                changed = true;
-            }
 
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Exposure Time");
-            ImGui::SameLine(spacing);
-            if (ImGui::SliderFloat("##camera_exptime", &camera_exposure, 0, 1, "%.3f", 2.0)) {
-                camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure / 1.25);
-            }
+                    // Camera Parameters Card
+                    if (BeginCard("Parameters", font_title, 5.5, show_parameters_card)) {
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Resolution");
+                        ImGui::SameLine(spacing);
+                        ImGui::PushItemWidth(44);
+                        ImGui::InputInt("##width", &camera_width, 0);
+                        ImGui::SameLine();
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("x");
+                        ImGui::SameLine();
+                        ImGui::InputInt("##height", &camera_height, 0);
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine(ImGui::GetWindowWidth() - 44);
+                        if (MaterialButton("Set")) {
+                            camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
+                            camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
+                            changed = true;
+                        }
 
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Select Format");
-            ImGui::SameLine(spacing);
-            if (ImGui::BeginCombo("##camera_fmt", camera_fmt[camera_currfmt].c_str(), 0)) {
-                for (int i = 0; i < camera_fmt.size(); i++) {
-                    bool is_selected = (camera_fmt[camera_currfmt] == camera_fmt[i]);
-                    if (ImGui::Selectable(camera_fmt[i].c_str(), is_selected)) {
-                        camera_currfmt = i;
-                        camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Framerate");
+                        ImGui::SameLine(spacing);
+                        if (ImGui::BeginCombo("##camera_fps", to_string(camera_fps[camera_currfps]).c_str(), 0)) {
+                            for (int i = 0; i < camera_fps.size(); i++) {
+                                bool is_selected = (camera_fps[camera_currfps] == camera_fps[i]);
+                                if (ImGui::Selectable(to_string(camera_fps[i]).c_str(), is_selected)) {
+                                    camera_currfps = i;
+                                    camera.set(CV_CAP_PROP_FPS, (double) camera_fps[camera_currfps]);
+                                }
+                                if (is_selected)
+                                    ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+                            }
+                            ImGui::EndCombo();
+                            changed = true;
+                        }
+
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Exposure Time");
+                        ImGui::SameLine(spacing);
+                        if (ImGui::SliderFloat("##camera_exptime", &camera_exposure, 0, 1, "%.3f", 2.0)) {
+                            camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure / 1.25);
+                        }
+
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Select Format");
+                        ImGui::SameLine(spacing);
+                        if (ImGui::BeginCombo("##camera_fmt", camera_fmt[camera_currfmt].c_str(), 0)) {
+                            for (int i = 0; i < camera_fmt.size(); i++) {
+                                bool is_selected = (camera_fmt[camera_currfmt] == camera_fmt[i]);
+                                if (ImGui::Selectable(camera_fmt[i].c_str(), is_selected)) {
+                                    camera_currfmt = i;
+                                    camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
+                                }
+                                if (is_selected)
+                                    ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+                            }
+                            ImGui::EndCombo();
+                            changed = true;
+                        }
+
+
+                        EndCard();
                     }
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
-                }
-                ImGui::EndCombo();
-                changed = true;
-            }
 
-            if (changed && camera_on) {
-                // Update params
-                camera.grab();
-                camera.retrieve(img);
-                camera_width = img.cols;
-                camera_height = img.rows;
-                img_ratio = (float) camera_width / (float) camera_height;
-                camera_actfps = camera.get(CV_CAP_PROP_FPS);
-                for (int i = 0; i < camera_fps.size(); i++)
-                    camera_currfps = (camera_fps[i] == camera_actfps) ? i : camera_currfps;
-                changed = false;
-            }
+                    // Calibration Parameters Card
+                    if (BeginCard("Calibration", font_title, 5.5, show_calibration_card)) {
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Calibrate");
+                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
+                        ToggleButton("##calib_toggle", &calibration_mode);
+                        if (camera_on && calibration_mode && ImGui::IsItemClicked(0)) {
+                            x_min = camera_width;
+                            x_max = 0;
+                            y_min = camera_height;
+                            y_max = 0;
+                            size_min = camera_width * camera_height;
+                            size_max = 0;
+                            max_size = sqrt(size_min) * 0.9f;
+                            instances.clear();
+                            instance_errs.clear();
+                        } else if (!camera_on)
+                            calibration_mode = false;
 
-            if (stream_on) {
-                camera.grab();
-                camera.retrieve(img);
-                cv::cvtColor(img, img, CV_BGR2RGB);
-            }
-
-            ImGui::Separator();
-
-            // Calibration Controls
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Calibration");
-            ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-            ToggleButton("##calib_toggle", &calibration_mode);
-            if (camera_on && calibration_mode && ImGui::IsItemClicked(0)) {
-                x_min = camera_width;
-                x_max = 0;
-                y_min = camera_height;
-                y_max = 0;
-                size_min = camera_width * camera_height;
-                size_max = 0;
-                max_size = sqrt(size_min) * 0.9f;
-                instances.clear();
-                instance_errs.clear();
-            } else if (!camera_on)
-                calibration_mode = false;
-
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Rows");
-            ImGui::SameLine(spacing);
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Rows");
+                        ImGui::SameLine(spacing);
 //            ImGui::PushItemWidth(48);
-            ImGui::InputInt("##chkbrd_rows", &chkbrd_rows, 1);
+                        ImGui::InputInt("##chkbrd_rows", &chkbrd_rows, 1);
 //            ImGui::SameLine();
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Cols");
-            ImGui::SameLine(spacing);
-            ImGui::InputInt("##chkbrd_cols", &chkbrd_cols, 1);
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Size in [m]");
-            ImGui::SameLine(spacing);
-            ImGui::InputFloat("##chkbrd_size", &chkbrd_size, 0.001f);
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Cols");
+                        ImGui::SameLine(spacing);
+                        ImGui::InputInt("##chkbrd_cols", &chkbrd_cols, 1);
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Size in [m]");
+                        ImGui::SameLine(spacing);
+                        ImGui::InputFloat("##chkbrd_size", &chkbrd_size, 0.001f);
 //            ImGui::PopItemWidth();
 
-            if (calibration_mode) {
+                        EndCard();
+                    }
+                    ImGui::EndTabItem();
+                }
+
+                if (changed && camera_on) {
+                    // Update params
+                    camera.grab();
+                    camera.retrieve(img);
+                    camera_width = img.cols;
+                    camera_height = img.rows;
+                    img_ratio = (float) camera_width / (float) camera_height;
+                    camera_actfps = camera.get(CV_CAP_PROP_FPS);
+                    for (int i = 0; i < camera_fps.size(); i++)
+                        camera_currfps = (camera_fps[i] == camera_actfps) ? i : camera_currfps;
+                    changed = false;
+                }
+
                 if (stream_on) {
-                    cv::Mat gray(img.rows, img.cols, CV_8UC1);
-                    cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
-                    cv::cvtColor(gray, img, cv::COLOR_GRAY2RGB);
-//                    cv::resize(gray, gray, cv::Size(gray.cols / 2, gray.rows / 2));
-                    if (findCorners(gray, corners, chkbrd_cols, chkbrd_rows))
-                        cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1), cv::Mat(corners),
-                                                  true);
-
-                    if (corners.size() > 0) {
-                        cv::RotatedRect rect = cv::minAreaRect(corners);
-                        mean = rect.center;
-                        size = sqrt(rect.size.area());
-                    }
+                    camera.grab();
+                    camera.retrieve(img);
+                    cv::cvtColor(img, img, CV_BGR2RGB);
                 }
 
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Horizontal Coverage");
+                // ==========================================
+                // Calibration Snapshots
+                // ==========================================
 
-                CoveredBar((x_min - (0.1f * camera_width)) / camera_width,
-                           (x_max + (0.1f * camera_width)) / camera_width,
-                           (camera_width - mean.x) / camera_width);
+                if (calibration_mode) {
+                    if (ImGui::BeginTabItem("Calibration")) {
 
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Vertical Coverage");
+                        // Detect Checkerboard
+                        if (stream_on) {
+                            cv::Mat gray(img.rows, img.cols, CV_8UC1);
+                            cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
+                            cv::cvtColor(gray, img, cv::COLOR_GRAY2RGB);
+                            //                    cv::resize(gray, gray, cv::Size(gray.cols / 2, gray.rows / 2));
+                            if (findCorners(gray, corners, chkbrd_cols, chkbrd_rows))
+                                cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1),
+                                                          cv::Mat(corners),
+                                                          true);
 
-                CoveredBar((y_min - (0.1f * camera_height)) / camera_height,
-                           (y_max + (0.1f * camera_height)) / camera_height,
-                           (camera_height - mean.y) / camera_height);
-
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Size Coverage");
-                CoveredBar((size_min - (0.1f * max_size)) / max_size,
-                           (size_max + (0.1f * max_size)) / max_size,
-                           (size / max_size));
-
-                ImGui::Separator();
-
-                // Collect snapshot button
-                // TODO automatic collection of snapshots
-                if (MaterialButton("Snapshot", !calibrated && instances.size() < 4) &&
-                    corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1)) && stream_on)
-                    taking_snapshot = true;
-
-                if (taking_snapshot && stream_on && corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
-                    ImGui::SameLine();
-                    ImGui::Text("Try not to move...");
-
-                    // Compare actual frame with previous frame for movement
-                    cv::Rect rect = cv::minAreaRect(corners).boundingRect();
-                    cv::Mat old_img;
-                    cv::Mat new_img;
-                    if (rect.x > 0 && rect.y > 0 && rect.x + rect.width < camera_width &&
-                        rect.y + rect.height < camera_height) {
-                        old_img = img_prev(rect);
-                        new_img = img(rect);
-                    } else {
-                        img_prev.copyTo(old_img);
-                        img.copyTo(new_img);
-                    }
-                    cv::cvtColor(old_img, old_img, cv::COLOR_RGB2GRAY);
-                    cv::cvtColor(new_img, new_img, cv::COLOR_RGB2GRAY);
-                    cv::Mat diff(old_img.rows, old_img.cols, CV_8UC1);
-                    cv::absdiff(old_img, new_img, diff);
-                    cv::Scalar mean_diff = cv::mean(diff);
-                    CoveredBar(0.0f, 1.0f - (float) mean_diff.val[0] / 127.0f);
-
-                    // If successful, add instance
-                    if (mean_diff.val[0] < 4) {
-                        snapshot instance;
-                        gettimeofday(&instance.id, NULL);
-                        img.copyTo(instance.img);
-                        instance.corners.assign(corners.begin(), corners.end());
-                        instances.push_back(instance);
-
-                        x_min = min(x_min, camera_width - mean.x);
-                        x_max = max(x_max, camera_width - mean.x);
-                        y_min = min(y_min, camera_height - mean.y);
-                        y_max = max(y_max, camera_height - mean.y);
-                        size_min = min(size_min, size);
-                        size_max = max(size_max, size);
-
-                        taking_snapshot = false;
-                    }
-                } else {
-                    ImGui::SameLine();
-                    if (!corners.empty())
-                        ImGui::Text("Ready");
-                    else
-                        ImGui::Text("No Checkerboard detected!");
-                    CoveredBar(0.0f, 0.0f);
-                }
-
-                // List all snapshots
-                // TODO progress bar of how many snapshots need to be taken
-                if (instances.size() > 0) {
-                    if (ImGui::ListBoxHeader("Snapshots", (int) instances.size(), -1)) {
-                        for (int i = 0; i < instances.size(); i++) {
-                            bool is_selected = i == snapshot_curr;
-                            double stamp = instances[i].id.tv_sec + (instances[i].id.tv_usec / 1e6);
-                            if (instance_errs.size() > i) {
-                                ImVec4 color = interp_color(instance_errs[i], 0.0f, 1.0f);
-                                color.x *= 0.56f;
-                                color.y *= 0.83f;
-                                color.w *= 0.5f;
-                                ImDrawList *drawList = ImGui::GetWindowDrawList();
-                                ImVec2 s(ImGui::GetContentRegionAvailWidth(), ImGui::GetTextLineHeight() + 3);
-                                ImVec2 p = ImGui::GetCursorScreenPos();
-//                                ImVec2 m = ImGui::GetStyle().ItemInnerSpacing;
-//                                p.x += m.x / 2;
-//                                p.y += m.y / 2;
-                                drawList->AddRectFilled(ImVec2(p.x - 3, p.y - 4), ImVec2(p.x + s.x + 3, p.y + s.y),
-                                                        ImGui::GetColorU32(color), 4.0f);
+                            if (corners.size() > 0) {
+                                cv::RotatedRect rect = cv::minAreaRect(corners);
+                                mean = rect.center;
+                                size = sqrt(rect.size.area());
                             }
-                            if (ImGui::Selectable(to_string(stamp).c_str(), is_selected)) {
-                                if (is_selected) {
-                                    snapshot_curr = -1;
-                                } else {
-                                    snapshot_curr = i;
-                                }
-                            }
-                            if (ImGui::BeginPopupContextItem()) {
-                                if (ImGui::Selectable("Remove")) {
-                                    int id = i;
-                                    instances.erase(instances.begin() + id);
-//                                    if (id < instance_errs.size())
-//                                        instance_errs.erase(instance_errs.begin() + id);
-                                    snapshot_curr--;
-                                }
-                                ImGui::EndPopup();
-                            }
-                            if (is_selected)
-                                ImGui::SetItemDefaultFocus();
                         }
-                        ImGui::ListBoxFooter();
+
+                        // Show Coverage Card
+                        if (BeginCard("Coverage", font_title, 7.5,
+                                      show_coverage_card)) {
+                            ImGui::AlignTextToFramePadding();
+                            ImGui::Text("Horizontal Coverage");
+
+                            CoveredBar((x_min - (0.1f * camera_width)) / camera_width,
+                                       (x_max + (0.1f * camera_width)) / camera_width,
+                                       (camera_width - mean.x) / camera_width);
+
+                            ImGui::AlignTextToFramePadding();
+                            ImGui::Text("Vertical Coverage");
+
+                            CoveredBar((y_min - (0.1f * camera_height)) / camera_height,
+                                       (y_max + (0.1f * camera_height)) / camera_height,
+                                       (camera_height - mean.y) / camera_height);
+
+                            ImGui::AlignTextToFramePadding();
+                            ImGui::Text("Size Coverage");
+                            CoveredBar((size_min - (0.1f * max_size)) / max_size,
+                                       (size_max + (0.1f * max_size)) / max_size,
+                                       (size / max_size));
+
+                            EndCard();
+                        }
+
+                        // Snapshots Card
+                        if (BeginCard("Snapshots", font_title, 3.5 + instances.size() * 0.75, show_snapshots_card)) {
+                            // Collect snapshot button
+                            // TODO automatic collection of snapshots
+                            if (MaterialButton("Snapshot", !calibrated && instances.size() < 4) &&
+                                corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1)) && stream_on)
+                                taking_snapshot = true;
+
+                            if (taking_snapshot && stream_on &&
+                                corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
+                                ImGui::SameLine();
+                                ImGui::Text("Try not to move...");
+
+                                // Compare actual frame with previous frame for movement
+                                cv::Rect rect = cv::minAreaRect(corners).boundingRect();
+                                cv::Mat old_img;
+                                cv::Mat new_img;
+                                if (rect.x > 0 && rect.y > 0 && rect.x + rect.width < camera_width &&
+                                    rect.y + rect.height < camera_height) {
+                                    old_img = img_prev(rect);
+                                    new_img = img(rect);
+                                } else {
+                                    img_prev.copyTo(old_img);
+                                    img.copyTo(new_img);
+                                }
+                                cv::cvtColor(old_img, old_img, cv::COLOR_RGB2GRAY);
+                                cv::cvtColor(new_img, new_img, cv::COLOR_RGB2GRAY);
+                                cv::Mat diff(old_img.rows, old_img.cols, CV_8UC1);
+                                cv::absdiff(old_img, new_img, diff);
+                                cv::Scalar mean_diff = cv::mean(diff);
+                                CoveredBar(0.0f, 1.0f - (float) mean_diff.val[0] / 127.0f);
+
+                                // If successful, add instance
+                                if (mean_diff.val[0] < 4) {
+                                    snapshot instance;
+                                    gettimeofday(&instance.id, NULL);
+                                    img.copyTo(instance.img);
+                                    instance.corners.assign(corners.begin(), corners.end());
+                                    instances.push_back(instance);
+
+                                    x_min = min(x_min, camera_width - mean.x);
+                                    x_max = max(x_max, camera_width - mean.x);
+                                    y_min = min(y_min, camera_height - mean.y);
+                                    y_max = max(y_max, camera_height - mean.y);
+                                    size_min = min(size_min, size);
+                                    size_max = max(size_max, size);
+
+                                    if (instances.size() >= 4) {
+                                        calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size, instances, R, T, K,
+                                                                     D, instance_errs, reprojection_err);
+                                        undistort = true;
+                                    }
+
+                                    taking_snapshot = false;
+                                }
+                            } else {
+                                ImGui::SameLine();
+                                if (!corners.empty())
+                                    ImGui::Text("Ready");
+                                else
+                                    ImGui::Text("No Checkerboard detected!");
+                                CoveredBar(0.0f, 0.0f);
+                            }
+
+                            // List all snapshots
+                            // TODO progress bar of how many snapshots need to be taken
+                            if (instances.size() > 0) {
+//                                if (ImGui::ListBoxHeader("##snapshots", (int) instances.size(), -1)) {
+                                ImGui::BeginGroup();
+                                for (int i = 0; i < instances.size(); i++) {
+                                    bool is_selected = i == snapshot_curr;
+                                    double stamp = instances[i].id.tv_sec + (instances[i].id.tv_usec / 1e6);
+                                    if (instance_errs.size() > i) {
+                                        ImVec4 color = interp_color(instance_errs[i], 0.0f, 1.0f);
+                                        color.x *= 0.56f;
+                                        color.y *= 0.83f;
+                                        color.w *= 0.5f;
+                                        ImDrawList *drawList = ImGui::GetWindowDrawList();
+                                        ImVec2 s(ImGui::GetContentRegionAvailWidth(),
+                                                 ImGui::GetTextLineHeight() + 3);
+                                        ImVec2 p = ImGui::GetCursorScreenPos();
+                                        //                                ImVec2 m = ImGui::GetStyle().ItemInnerSpacing;
+                                        //                                p.x += m.x / 2;
+                                        //                                p.y += m.y / 2;
+                                        drawList->AddRectFilled(ImVec2(p.x - 3, p.y - 4),
+                                                                ImVec2(p.x + s.x + 3, p.y + s.y),
+                                                                ImGui::GetColorU32(color), 4.0f);
+                                    }
+                                    if (ImGui::Selectable(to_string(stamp).c_str(), is_selected)) {
+                                        if (is_selected) {
+                                            snapshot_curr = -1;
+                                        } else {
+                                            snapshot_curr = i;
+                                        }
+                                    }
+                                    if (ImGui::BeginPopupContextItem()) {
+                                        if (ImGui::Selectable("Remove")) {
+                                            int id = i;
+                                            instances.erase(instances.begin() + id);
+                                            //                                    if (id < instance_errs.size())
+                                            //                                        instance_errs.erase(instance_errs.begin() + id);
+                                            snapshot_curr--;
+                                        }
+                                        ImGui::EndPopup();
+                                    }
+                                    if (is_selected)
+                                        ImGui::SetItemDefaultFocus();
+                                }
+                                ImGui::EndGroup();
+//                                    ImGui::ListBoxFooter();
+//                                }
+                            }
+                            EndCard();
+                        }
+                        ImGui::EndTabItem();
                     }
                 }
 
                 // Calibrate Using snapshots if enough (min is 4 to solve for 8 DOF)
-                if (instances.size() >= 4) {
-                    ImGui::Separator();
-                    if (MaterialButton("Re-Calibrate", false) || instances.size() != instance_errs.size()) {
-                        // Initialize values
-                        vector<cv::Point3f> corners3d;
-                        for (int i = 0; i < chkbrd_rows - 1; ++i)
-                            for (int j = 0; j < chkbrd_cols - 1; ++j)
-                                corners3d.push_back(cv::Point3f(float(j * chkbrd_size), float(i * chkbrd_size), 0));
+                if (instances.size() >= 4 && calibration_mode) {
+                    if (ImGui::BeginTabItem("Results")) {
+                        // Results Card
+                        if (BeginCard("Results", font_title, 7.5,
+                                      show_result_card)) {
+                            if (MaterialButton("Re-Calibrate", false) || instances.size() != instance_errs.size()) {
+                                calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size, instances, R, T, K,
+                                                             D, instance_errs, reprojection_err);
+                                undistort = true;
+                            }
 
-                        vector<vector<cv::Point2f>> imgPoints;
-                        vector<vector<cv::Point3f>> objPoints;
-                        for (const auto &instance : instances) {
-                            imgPoints.push_back(instance.corners);
-                            objPoints.push_back(corners3d);
+                            if (calibrated) {
+                                ImGui::SameLine();
+                                if (MaterialButton("Export", calibrated)) {
+                                    cv::FileStorage fs("~/Desktop/calibration.yaml",
+                                                       cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
+                                    fs << "image_width" << camera_width;
+                                    fs << "image_height" << camera_height;
+                                    fs << "camera_name" << cameras[camera_curr];
+                                    fs << "camera_matrix" << K;
+                                    fs << "distortion_model" << "plumb_bob";
+                                    fs << "distortion_coefficients" << D;
+                                    fs << "rectification_matrix" << cv::Mat::eye(3, 3, CV_64F);
+                                    fs << "projection_matrix" << K.mul(cv::Mat::eye(3, 4, CV_64F));
+                                }
+                                stringstream result_ss;
+                                result_ss << "K = " << K << endl << endl;
+                                result_ss << "D = " << D;
+                                string result = result_ss.str();
+                                char output[result.size() + 1];
+                                strcpy(output, result.c_str());
+                                ImGui::InputTextMultiline("##result", output, result.size(),
+                                                          ImVec2(0, ImGui::GetTextLineHeight() * 11),
+                                                          ImGuiInputTextFlags_ReadOnly);
+                            }
+                            EndCard();
                         }
-
-                        cv::calibrateCamera(objPoints, imgPoints, cv::Size(camera_width, camera_height),
-                                            K, D, R, T, CV_CALIB_FIX_ASPECT_RATIO |
-                                                        CV_CALIB_FIX_K4 |
-                                                        CV_CALIB_FIX_K5);
-
-                        reprojection_err = computeReprojectionErrors(objPoints, imgPoints, R, T, K, D, instance_errs);
-
-                        if (!calibrated)
-                            calibrated = true;
-                        undistort = true;
-                    }
-
-                    if (calibrated) {
-                        ImGui::SameLine();
-                        if (MaterialButton("Export", calibrated)) {
-                            cv::FileStorage fs("~/Desktop/calibration.yaml",
-                                               cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
-                            fs << "image_width" << camera_width;
-                            fs << "image_height" << camera_height;
-                            fs << "camera_name" << cameras[camera_curr];
-                            fs << "camera_matrix" << K;
-                            fs << "distortion_model" << "plumb_bob";
-                            fs << "distortion_coefficients" << D;
-                            fs << "rectification_matrix" << cv::Mat::eye(3, 3, CV_64F);
-                            fs << "projection_matrix" << K.mul(cv::Mat::eye(3, 4, CV_64F));
-                        }
-                        stringstream result_ss;
-                        result_ss << "K = " << K << endl << endl;
-                        result_ss << "D = " << D;
-                        string result = result_ss.str();
-                        char output[result.size() + 1];
-                        strcpy(output, result.c_str());
-                        ImGui::InputTextMultiline("##result", output, result.size(),
-                                                  ImVec2(0, ImGui::GetTextLineHeight() * 11),
-                                                  ImGuiInputTextFlags_ReadOnly);
+                        ImGui::EndTabItem();
                     }
                 }
+                ImGui::EndTabBar();
 
                 if (snapshot_curr != -1) {
                     stream_on = false;
@@ -788,8 +951,6 @@ int main(int, char **) {
 
             img.copyTo(img_prev);
 
-            ImGui::NewLine();
-
 //            ImGui::SetCursorPosY(
 //                    max(0.0f, (ImGui::GetContentRegionMax().y - min(0.0f, ImGui::GetContentRegionAvail().y) -
 //                               ImGui::GetFontSize() + ImGui::GetScrollY())));
@@ -797,6 +958,7 @@ int main(int, char **) {
 //                        ImGui::GetIO().Framerate);
             ImGui::End();
         }
+
 
         // Show image preview
         {
@@ -846,7 +1008,8 @@ int main(int, char **) {
                 else
                     reproj_error = "Reprojection Error: " + to_string(instance_errs[snapshot_curr]);
                 ImGui::SetCursorPos(ImVec2(pos.x + 16, pos.y + 16));
-                ImGui::TextColored(ImColor(255, 255, 255, 255), reproj_error.c_str());
+                const char *reproj_err = reproj_error.c_str();
+                ImGui::TextColored(ImColor(255, 255, 255, 255), reproj_err);
             }
 
             ImGui::End();
@@ -866,14 +1029,18 @@ int main(int, char **) {
         SDL_GL_SwapWindow(window);
     }
 
-    // Cleanup
+// Cleanup
     ImGui_ImplOpenGL3_Shutdown();
+
     ImGui_ImplSDL2_Shutdown();
+
     ImGui::DestroyContext();
 
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
+
     SDL_Quit();
 
     return 0;
 }
+
