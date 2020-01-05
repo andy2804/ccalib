@@ -96,8 +96,8 @@ double computeReprojectionErrors(const vector<vector<cv::Point3f> > &objectPoint
 }
 
 bool calibrateCamera(const int &chkbrd_rows, const int &chkbrd_cols, const float &chkbrd_size,
-                     vector<snapshot> instances, const vector<cv::Mat> &R, const vector<cv::Mat> &T,
-                     const cv::Mat &K, const cv::Mat &D, vector<float> &instance_errs, double &reprojection_err) {
+                     vector<snapshot> instances, vector<cv::Mat> &R, vector<cv::Mat> &T,
+                     cv::Mat &K, cv::Mat &D, vector<float> &instance_errs, double &reprojection_err) {
     // Initialize values
     vector<cv::Point3f> corners3d;
     for (int i = 0; i < chkbrd_rows - 1; ++i)
@@ -899,7 +899,7 @@ int main(int, char **) {
                 if (instances.size() >= 4 && calibration_mode) {
                     if (ImGui::BeginTabItem("Results")) {
                         // Results Card
-                        if (BeginCard("Results", font_title, 7.5,
+                        if (BeginCard("Results", font_title, 7,
                                       show_result_card)) {
                             if (MaterialButton("Re-Calibrate", false) || instances.size() != instance_errs.size()) {
                                 calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size, instances, R, T, K,
@@ -928,7 +928,7 @@ int main(int, char **) {
                                 char output[result.size() + 1];
                                 strcpy(output, result.c_str());
                                 ImGui::InputTextMultiline("##result", output, result.size(),
-                                                          ImVec2(0, ImGui::GetTextLineHeight() * 11),
+                                                          ImVec2(0, ImGui::GetTextLineHeight() * 10.5),
                                                           ImGuiInputTextFlags_ReadOnly);
                             }
                             EndCard();
