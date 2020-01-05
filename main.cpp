@@ -129,7 +129,7 @@ ImVec4 interp_color(const float &x, const float &lb, const float &ub) {
     return ImVec4(1.0f - x_interp, x_interp, 0.0f, 1.0f);
 }
 
-void ToggleButton(const char *str_id, bool *v) {
+void ToggleButton(const char *str_id, bool *v, const bool focus = false) {
     ImVec2 p = ImGui::GetCursorScreenPos();
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
 
@@ -152,7 +152,21 @@ void ToggleButton(const char *str_id, bool *v) {
         t = *v ? (t_anim) : (1.0f - t_anim);
     }
 
+    // Draw rectangle if focused
     ImU32 col_bg;
+    if (focus) {
+        float padding = 1.6f;
+        float margin = 0.2f;
+        float ANIM_SPEED = 0.32f;
+        float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
+        col_bg = ImGui::GetColorU32(
+                ImLerp(ImVec4(0.56f, 0.83f, 0.26f, 1.0f), ImVec4(0.72f, 0.91f, 0.42f, 1.0f), t_anim));
+
+        draw_list->AddRect(ImVec2(p.x - padding - margin, p.y - padding - margin),
+                           ImVec2(p.x + width + padding + margin, p.y + height + padding + margin), col_bg, height * 0.5f,
+                           ImDrawCornerFlags_All, padding * 2);
+    }
+
     if (ImGui::IsItemHovered())
         col_bg = ImGui::GetColorU32(ImLerp(ImVec4(0.78f, 0.78f, 0.78f, 1.0f), ImVec4(0.64f, 0.83f, 0.34f, 1.0f), t));
     else
@@ -179,9 +193,12 @@ void CoveredBar(const float &start, const float &stop, const float &indicator = 
                                  ImGui::GetColorU32(ImVec4(0.56f, 0.83f, 0.26f, 1.0f)), height * 0.5f);
     }
 
-    if (indicator >= 0)
+    if (indicator >= 0) {
+        draw_list->AddCircleFilled(ImVec2(p.x + indicator * width, p.y + height / 2.0f), height + 1.5f,
+                                   ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 0.1f)));
         draw_list->AddCircleFilled(ImVec2(p.x + indicator * width, p.y + height / 2.0f), height,
                                    ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+    }
 
     ImGui::InvisibleButton("##covered_bar", ImVec2(width, ImGui::GetFrameHeight()));
 }
@@ -253,7 +270,7 @@ bool BeginCard(const char *label, ImFont *title_font, const float &item_height, 
                                       ImGui::GetTextLineHeightWithSpacing() * 7.4f + style.ItemSpacing.y);
     ImRect frame_bb(window->DC.CursorPos, ImVec2(window->DC.CursorPos.x + size.x, window->DC.CursorPos.y + size.y));
     ImRect bb(frame_bb.Min, frame_bb.Max);
-    window->DC.LastItemRect = bb; // Forward storage for ListBoxFooter.. dodgy.
+    window->DC.LastItemRect = bb; // Forward storage
     g.NextItemData.ClearFlags();
 
     if (!ImGui::IsRectVisible(bb.Min, bb.Max)) {
@@ -299,8 +316,6 @@ void EndCard() {
     ImGui::EndChild();
     ImGui::PopStyleColor(1);
 
-    // Redeclare item size so that it includes the label (we have stored the full size in LastItemRect)
-    // We call SameLine() to restore DC.CurrentLine* data
     ImGui::SameLine();
     parent_window->DC.CursorPos = bb.Min;
     ImGui::ItemSize(bb, style.FramePadding.y);
@@ -409,9 +424,9 @@ int main(int, char **) {
     colors[ImGuiCol_ResizeGrip] = ImVec4(0.80f, 0.80f, 0.80f, 0.56f);
     colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.71f, 0.71f, 0.71f, 0.91f);
     colors[ImGuiCol_ResizeGripActive] = ImVec4(0.00f, 0.00f, 0.00f, 0.95f);
-    colors[ImGuiCol_Tab] = ImVec4(0.81f, 0.81f, 0.81f, 0.49f);
-    colors[ImGuiCol_TabHovered] = ImVec4(1.00f, 1.00f, 1.00f, 0.49f);
-    colors[ImGuiCol_TabActive] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+    colors[ImGuiCol_Tab] = ImVec4(0.90f, 0.90f, 0.90f, 0.49f);
+    colors[ImGuiCol_TabHovered] = ImVec4(0.55f, 0.55f, 0.55f, 0.49f);
+    colors[ImGuiCol_TabActive] = ImVec4(0.78f, 0.78f, 0.78f, 1.00f);
     colors[ImGuiCol_TabUnfocused] = ImVec4(0.92f, 0.93f, 0.94f, 0.99f);
     colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.74f, 0.83f, 0.50f, 0.79f);
     colors[ImGuiCol_PlotLines] = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
@@ -437,8 +452,8 @@ int main(int, char **) {
     bool show_demo_window = false;
     bool show_camera_card = true;
     bool show_parameters_card = false;
-    bool show_calibration_card = false;
-    bool show_coverage_card = true;
+    bool show_calibration_card = true;
+    bool show_coverage_card = false;
     bool show_snapshots_card = true;
     bool show_result_card = true;
     bool calibration_mode = false;
@@ -568,7 +583,7 @@ int main(int, char **) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Stream");
                         ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-                        ToggleButton("##cam_toggle", &camera_on);
+                        ToggleButton("##cam_toggle", &camera_on, !camera_on);
                         if (camera_on && ImGui::IsItemClicked(0)) {
                             camera.open(camera_curr);
                             camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
@@ -615,8 +630,10 @@ int main(int, char **) {
                         ImGui::SameLine();
                         ImGui::InputInt("##height", &camera_height, 0);
                         ImGui::PopItemWidth();
-                        ImGui::SameLine(ImGui::GetWindowWidth() - 44);
-                        if (MaterialButton("Set")) {
+                        const char *button_text = "Set";
+                        ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
+                                        style.FramePadding.x);
+                        if (MaterialButton(button_text)) {
                             camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
                             camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
                             changed = true;
@@ -670,37 +687,42 @@ int main(int, char **) {
                     // Calibration Parameters Card
                     if (BeginCard("Calibration", font_title, 5.5, show_calibration_card)) {
                         ImGui::AlignTextToFramePadding();
-                        ImGui::Text("Calibrate");
-                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-                        ToggleButton("##calib_toggle", &calibration_mode);
-                        if (camera_on && calibration_mode && ImGui::IsItemClicked(0)) {
-                            x_min = camera_width;
-                            x_max = 0;
-                            y_min = camera_height;
-                            y_max = 0;
-                            size_min = camera_width * camera_height;
-                            size_max = 0;
-                            max_size = sqrt(size_min) * 0.9f;
-                            instances.clear();
-                            instance_errs.clear();
-                        } else if (!camera_on)
-                            calibration_mode = false;
-
-                        ImGui::AlignTextToFramePadding();
                         ImGui::Text("Rows");
                         ImGui::SameLine(spacing);
-//            ImGui::PushItemWidth(48);
                         ImGui::InputInt("##chkbrd_rows", &chkbrd_rows, 1);
-//            ImGui::SameLine();
+
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Cols");
                         ImGui::SameLine(spacing);
                         ImGui::InputInt("##chkbrd_cols", &chkbrd_cols, 1);
+
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Size in [m]");
                         ImGui::SameLine(spacing);
                         ImGui::InputFloat("##chkbrd_size", &chkbrd_size, 0.001f);
-//            ImGui::PopItemWidth();
+
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Calibration");
+                        const char *button_text = calibration_mode ? "Reset" : "Start";
+                        ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
+                                        style.FramePadding.x);
+                        if (MaterialButton(button_text, !calibration_mode && stream_on)) {
+                            calibration_mode = !calibration_mode;
+                            if (camera_on && calibration_mode) {
+                                x_min = camera_width;
+                                x_max = 0;
+                                y_min = camera_height;
+                                y_max = 0;
+                                size_min = camera_width * camera_height;
+                                size_max = 0;
+                                max_size = sqrt(size_min) * 0.9f;
+                                instances.clear();
+                                instance_errs.clear();
+                            }
+                        }
+
+                        if (!camera_on)
+                            calibration_mode = false;
 
                         EndCard();
                     }
@@ -778,18 +800,22 @@ int main(int, char **) {
                         }
 
                         // Snapshots Card
-                        if (BeginCard("Snapshots", font_title, 3.5 + instances.size() * 0.75, show_snapshots_card)) {
+                        if (BeginCard("Snapshots", font_title, 3.3 + instances.size() * 0.76, show_snapshots_card)) {
                             // Collect snapshot button
                             // TODO automatic collection of snapshots
-                            if (MaterialButton("Snapshot", !calibrated && instances.size() < 4) &&
-                                corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1)) && stream_on)
+                            const char *status_text;
+                            if (MaterialButton("Snapshot", !calibrated && instances.size() < 4) && stream_on)
                                 taking_snapshot = true;
 
-                            if (taking_snapshot && stream_on &&
-                                corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
-                                ImGui::SameLine();
-                                ImGui::Text("Try not to move...");
+                            if (taking_snapshot)
+                                status_text = "Try not to move...";
+                            else if (!corners.empty())
+                                status_text = "Ready";
+                            else
+                                status_text = "No Checkerboard detected!";
+                            float movement_ind = 0.0f;
 
+                            if (stream_on && corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
                                 // Compare actual frame with previous frame for movement
                                 cv::Rect rect = cv::minAreaRect(corners).boundingRect();
                                 cv::Mat old_img;
@@ -807,10 +833,10 @@ int main(int, char **) {
                                 cv::Mat diff(old_img.rows, old_img.cols, CV_8UC1);
                                 cv::absdiff(old_img, new_img, diff);
                                 cv::Scalar mean_diff = cv::mean(diff);
-                                CoveredBar(0.0f, 1.0f - (float) mean_diff.val[0] / 127.0f);
+                                movement_ind = 1.0f - (float) mean_diff.val[0] / 127.0f;
 
                                 // If successful, add instance
-                                if (mean_diff.val[0] < 4) {
+                                if (taking_snapshot && mean_diff.val[0] < 4) {
                                     snapshot instance;
                                     gettimeofday(&instance.id, NULL);
                                     img.copyTo(instance.img);
@@ -825,69 +851,77 @@ int main(int, char **) {
                                     size_max = max(size_max, size);
 
                                     if (instances.size() >= 4) {
-                                        calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size, instances, R, T, K,
+                                        calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size, instances,
+                                                                     R, T, K,
                                                                      D, instance_errs, reprojection_err);
                                         undistort = true;
                                     }
 
                                     taking_snapshot = false;
                                 }
-                            } else {
-                                ImGui::SameLine();
-                                if (!corners.empty())
-                                    ImGui::Text("Ready");
-                                else
-                                    ImGui::Text("No Checkerboard detected!");
-                                CoveredBar(0.0f, 0.0f);
                             }
+
+                            ImGui::SameLine();
+                            ImGui::Text(status_text);
+                            CoveredBar(0.0f, movement_ind);
 
                             // List all snapshots
                             // TODO progress bar of how many snapshots need to be taken
                             if (instances.size() > 0) {
-//                                if (ImGui::ListBoxHeader("##snapshots", (int) instances.size(), -1)) {
+                                ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 16);
+                                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 11));
+                                ImGui::BeginColumns("##snapshots", 1, ImGuiColumnsFlags_NoBorder);
                                 ImGui::BeginGroup();
+                                ImDrawList *drawList = ImGui::GetWindowDrawList();
                                 for (int i = 0; i < instances.size(); i++) {
+                                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4);
                                     bool is_selected = i == snapshot_curr;
                                     double stamp = instances[i].id.tv_sec + (instances[i].id.tv_usec / 1e6);
+                                    ImVec2 p = ImGui::GetCursorScreenPos();
+                                    ImVec2 s(ImGui::GetContentRegionAvailWidth(),
+                                             ImGui::GetTextLineHeight() + 4);
+
                                     if (instance_errs.size() > i) {
                                         ImVec4 color = interp_color(instance_errs[i], 0.0f, 1.0f);
                                         color.x *= 0.56f;
                                         color.y *= 0.83f;
                                         color.w *= 0.5f;
-                                        ImDrawList *drawList = ImGui::GetWindowDrawList();
-                                        ImVec2 s(ImGui::GetContentRegionAvailWidth(),
-                                                 ImGui::GetTextLineHeight() + 3);
-                                        ImVec2 p = ImGui::GetCursorScreenPos();
-                                        //                                ImVec2 m = ImGui::GetStyle().ItemInnerSpacing;
-                                        //                                p.x += m.x / 2;
-                                        //                                p.y += m.y / 2;
-                                        drawList->AddRectFilled(ImVec2(p.x - 3, p.y - 4),
-                                                                ImVec2(p.x + s.x + 3, p.y + s.y),
-                                                                ImGui::GetColorU32(color), 4.0f);
+                                        drawList->AddRectFilled(ImVec2(p.x - 4, p.y - 4),
+                                                                ImVec2(p.x + s.x + 4, p.y + s.y),
+                                                                ImGui::GetColorU32(color), 3.0f);
                                     }
+
                                     if (ImGui::Selectable(to_string(stamp).c_str(), is_selected)) {
-                                        if (is_selected) {
+                                        if (is_selected)
                                             snapshot_curr = -1;
-                                        } else {
+                                        else
                                             snapshot_curr = i;
+                                    }
+
+                                    if (is_selected) {
+//                                        ImGui::SetItemDefaultFocus();
+                                        drawList->AddRect(ImVec2(p.x - 5, p.y - 5),
+                                                                ImVec2(p.x + s.x + 5, p.y + s.y + 1),
+                                                                ImGui::GetColorU32(ImVec4(0.56f, 0.83f, 0.26f, 1.0f)),
+                                                                3.0f, ImDrawCornerFlags_All, 3.0f);
+                                        if (ImGui::BeginPopupContextItem()) {
+                                            if (ImGui::Selectable("Remove")) {
+                                                instances.erase(instances.begin() + snapshot_curr);
+                                                snapshot_curr--;
+                                                if (instances.size() >= 4) {
+                                                    calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size,
+                                                                                 instances, R, T, K,
+                                                                                 D, instance_errs, reprojection_err);
+                                                }
+                                            }
+                                            ImGui::EndPopup();
                                         }
                                     }
-                                    if (ImGui::BeginPopupContextItem()) {
-                                        if (ImGui::Selectable("Remove")) {
-                                            int id = i;
-                                            instances.erase(instances.begin() + id);
-                                            //                                    if (id < instance_errs.size())
-                                            //                                        instance_errs.erase(instance_errs.begin() + id);
-                                            snapshot_curr--;
-                                        }
-                                        ImGui::EndPopup();
-                                    }
-                                    if (is_selected)
-                                        ImGui::SetItemDefaultFocus();
                                 }
                                 ImGui::EndGroup();
-//                                    ImGui::ListBoxFooter();
-//                                }
+                                ImGui::EndColumns();
+                                ImGui::PopStyleVar(1);
+                                ImGui::PopItemWidth();
                             }
                             EndCard();
                         }
@@ -895,8 +929,11 @@ int main(int, char **) {
                     }
                 }
 
-                // Calibrate Using snapshots if enough (min is 4 to solve for 8 DOF)
-                if (instances.size() >= 4 && calibration_mode) {
+                // ==========================================
+                // Results Tab
+                // ==========================================
+
+                if (instances.size() >= 4 && calibration_mode && calibrated) {
                     if (ImGui::BeginTabItem("Results")) {
                         // Results Card
                         if (BeginCard("Results", font_title, 7.5,
@@ -910,7 +947,7 @@ int main(int, char **) {
                             if (calibrated) {
                                 ImGui::SameLine();
                                 if (MaterialButton("Export", calibrated)) {
-                                    cv::FileStorage fs("~/Desktop/calibration.yaml",
+                                    cv::FileStorage fs("calibration.yaml",
                                                        cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
                                     fs << "image_width" << camera_width;
                                     fs << "image_height" << camera_height;
@@ -970,7 +1007,8 @@ int main(int, char **) {
 
             ImGui::Begin("Preview", nullptr,
                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
-                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                         ImGuiWindowFlags_NoTitleBar);
 
             if (camera_on) {
                 if (stream_on) {
@@ -987,17 +1025,16 @@ int main(int, char **) {
             }
 
             // Camera image
+            float width_avail = ImGui::GetContentRegionAvail().x;
             float height_avail = ImGui::GetContentRegionAvail().y;
             if (!img.empty()) {
-                if (height_avail * img_ratio > ImGui::GetWindowWidth())
-                    cv::resize(img, img,
-                               cv::Size((int) ImGui::GetWindowWidth(), (int) (ImGui::GetWindowWidth() / img_ratio)));
+                if (height_avail * img_ratio > width_avail)
+                    cv::resize(img, img, cv::Size((int) width_avail, (int) (width_avail / img_ratio)));
                 else
-                    cv::resize(img, img,
-                               cv::Size((int) (height_avail * img_ratio), (int) height_avail));
+                    cv::resize(img, img, cv::Size((int) (height_avail * img_ratio), (int) height_avail));
             }
 
-            ImVec2 pos = ImVec2((ImGui::GetWindowWidth() - img.cols) / 2,
+            ImVec2 pos = ImVec2((width_avail - img.cols) / 2 + ImGui::GetCursorPosX(),
                                 (height_avail - img.rows) / 2 + ImGui::GetCursorPosY());
             ImGui::SetCursorPos(pos);
             ImGui::Image((void *) (intptr_t) texture, ImVec2(img.cols, img.rows));
@@ -1008,7 +1045,10 @@ int main(int, char **) {
                     reproj_error = "Mean Reprojection Error: " + to_string(reprojection_err);
                 else
                     reproj_error = "Reprojection Error: " + to_string(instance_errs[snapshot_curr]);
-                ImGui::SetCursorPos(ImVec2(pos.x + 16, pos.y + 16));
+                float text_width = ImGui::CalcTextSize(reproj_error.c_str()).x;
+                ImGui::SetCursorPos(ImVec2(pos.x + img.cols - text_width - 16, pos.y + 17));
+                ImGui::TextColored(ImColor(0, 0, 0, 255), reproj_error.c_str());
+                ImGui::SetCursorPos(ImVec2(pos.x + img.cols - text_width - 16, pos.y + 16));
                 ImGui::TextColored(ImColor(255, 255, 255, 255), reproj_error.c_str());
             }
 
