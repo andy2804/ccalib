@@ -899,7 +899,7 @@ int main(int, char **) {
                 if (instances.size() >= 4 && calibration_mode) {
                     if (ImGui::BeginTabItem("Results")) {
                         // Results Card
-                        if (BeginCard("Results", font_title, 7,
+                        if (BeginCard("Results", font_title, 7.5,
                                       show_result_card)) {
                             if (MaterialButton("Re-Calibrate", false) || instances.size() != instance_errs.size()) {
                                 calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size, instances, R, T, K,
@@ -928,7 +928,7 @@ int main(int, char **) {
                                 char output[result.size() + 1];
                                 strcpy(output, result.c_str());
                                 ImGui::InputTextMultiline("##result", output, result.size(),
-                                                          ImVec2(0, ImGui::GetTextLineHeight() * 10.5),
+                                                          ImVec2(0, ImGui::GetTextLineHeight() * 11),
                                                           ImGuiInputTextFlags_ReadOnly);
                             }
                             EndCard();
@@ -987,17 +987,18 @@ int main(int, char **) {
             }
 
             // Camera image
+            float height_avail = ImGui::GetContentRegionAvail().y;
             if (!img.empty()) {
-                if (ImGui::GetWindowHeight() * img_ratio > ImGui::GetWindowWidth())
+                if (height_avail * img_ratio > ImGui::GetWindowWidth())
                     cv::resize(img, img,
                                cv::Size((int) ImGui::GetWindowWidth(), (int) (ImGui::GetWindowWidth() / img_ratio)));
                 else
                     cv::resize(img, img,
-                               cv::Size((int) (ImGui::GetWindowHeight() * img_ratio), (int) ImGui::GetWindowHeight()));
+                               cv::Size((int) (height_avail * img_ratio), (int) height_avail));
             }
 
             ImVec2 pos = ImVec2((ImGui::GetWindowWidth() - img.cols) / 2,
-                                (ImGui::GetWindowHeight() - img.rows) / 2 + ImGui::GetFrameHeight());
+                                (height_avail - img.rows) / 2 + ImGui::GetCursorPosY());
             ImGui::SetCursorPos(pos);
             ImGui::Image((void *) (intptr_t) texture, ImVec2(img.cols, img.rows));
 
@@ -1008,8 +1009,7 @@ int main(int, char **) {
                 else
                     reproj_error = "Reprojection Error: " + to_string(instance_errs[snapshot_curr]);
                 ImGui::SetCursorPos(ImVec2(pos.x + 16, pos.y + 16));
-                const char *reproj_err = reproj_error.c_str();
-                ImGui::TextColored(ImColor(255, 255, 255, 255), reproj_err);
+                ImGui::TextColored(ImColor(255, 255, 255, 255), reproj_error.c_str());
             }
 
             ImGui::End();
