@@ -1221,7 +1221,7 @@ int main(int, char **) {
             }
 
             // Draw Frame around checkerboard
-            if (calibration_mode && !frame_corners.empty()) {
+            if (calibration_mode && !corners.empty() && !frame_corners.empty()) {
                 increaseRectSize(frame_corners, size * 64);
                 if (flip_img) {
                     flipPoints(frame_corners, img_size_old);
@@ -1250,7 +1250,7 @@ int main(int, char **) {
                     target_corners[i].y = target_corners[i].y * img.rows + offset.y;
                 }
 
-                if (!corners.empty() && curr_snapshot == -1) {
+                if (!corners.empty() && !frame_corners.empty() && curr_snapshot == -1) {
                     double dist = cv::norm((target_corners[0] + (target_corners[2] - target_corners[0]) / 2) -
                                            (frame_corners[0] + (frame_corners[2] - frame_corners[0]) / 2));
                     double frameArea = cv::contourArea(frame_corners);
