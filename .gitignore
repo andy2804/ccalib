@@ -4,6 +4,7 @@
 
 # Build Files
 cmake*
+build/*
 
 # Python
 __pychache__/

@@ -263,7 +263,7 @@ bool MaterialButton(const char *label, bool focus = false, const ImVec2 &size = 
     return clicked;
 }
 
-void drawRectangle(const vector<ImVec2> &corners, const ImVec4 &color, const float &thickness = 1.0f,
+void drawRectangle(const vector<cv::Point2f> &corners, const ImVec4 &color, const float &thickness = 1.0f,
                    bool focus = false) {
     // Get Position and Drawlist
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
@@ -283,7 +283,39 @@ void drawRectangle(const vector<ImVec2> &corners, const ImVec4 &color, const flo
         col_bg = ImGui::GetColorU32(color);
 
     // Draw Rectangle
-    draw_list->AddQuad(corners[0], corners[1], corners[2], corners[3], col_bg, thickness);
+    ImVec2 im_corners[corners.size()];
+    for (int i = 0; i < corners.size(); i++) {
+        im_corners[i].x = corners[i].x;
+        im_corners[i].y = corners[i].y;
+    }
+    draw_list->AddPolyline(im_corners, IM_ARRAYSIZE(im_corners), col_bg, true, thickness);
+//    draw_list->AddQuad(corners[0], corners[1], corners[2], corners[3], col_bg, thickness);
+}
+
+void drawPoints(const vector<cv::Point2f> &corners, const ImVec4 &color, const float &size = 1.0f, bool focus = false) {
+    // Get Position and Drawlist
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    ImGuiContext &g = *GImGui;
+    ImU32 col_bg;
+
+    // Draw rectangle if focused
+    if (focus) {
+        float ANIM_SPEED = 0.32f;
+        float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
+        const ImVec4 color_dark = ImVec4(ImSaturate(color.x * 0.8f), ImSaturate(color.y * 0.8f),
+                                         ImSaturate(color.z * 0.8f), ImSaturate(color.w * 0.8f));
+        const ImVec4 color_bright = ImVec4(ImSaturate(color.x * 1.2f), ImSaturate(color.y * 1.2f),
+                                           ImSaturate(color.z * 1.2f), ImSaturate(color.w * 1.2f));
+        col_bg = ImGui::GetColorU32(ImLerp(color_dark, color_bright, t_anim));
+    } else
+        col_bg = ImGui::GetColorU32(color);
+
+    // Draw Rectangle
+    for (int i = 0; i < corners.size(); i++) {
+        draw_list->AddCircleFilled(ImVec2(corners[i].x, corners[i].y), size, col_bg);
+        draw_list->AddCircle(ImVec2(corners[i].x, corners[i].y), size * 4.0f, col_bg, 12, size);
+        draw_list->AddText(ImVec2(corners[i].x + size * 5.0f, corners[i].y + size * 5.0f), col_bg, to_string(i + 1).c_str());
+    }
 }
 
 bool BeginCard(const char *label, ImFont *title_font, const float &item_height, bool &visible) {
@@ -867,10 +899,11 @@ int main(int, char **) {
                             cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
                             cv::cvtColor(gray, img, cv::COLOR_GRAY2RGB);
                             //                    cv::resize(gray, gray, cv::Size(gray.cols / 2, gray.rows / 2));
-                            if (findCorners(gray, corners, chkbrd_cols, chkbrd_rows))
-                                cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1),
-                                                          cv::Mat(corners),
-                                                          true);
+                            if (findCorners(gray, corners, chkbrd_cols, chkbrd_rows)) {
+//                                cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1),
+//                                                          cv::Mat(corners),
+//                                                          true);
+                            }
 
                             if (corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
 //                                cv::RotatedRect rect = cv::minAreaRect(corners);
@@ -991,13 +1024,17 @@ int main(int, char **) {
                             if (snapshots.size() > 0) {
                                 ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 16);
                                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 11));
+                                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.2f, 0.2f, 0.2f, 0.2f));
+                                ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0f, 1.0f, 1.0f, 0.8f));
                                 ImGui::BeginColumns("##snapshots", 1, ImGuiColumnsFlags_NoBorder);
                                 ImGui::BeginGroup();
                                 ImDrawList *drawList = ImGui::GetWindowDrawList();
                                 for (int i = 0; i < snapshots.size(); i++) {
                                     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4);
                                     bool is_selected = i == curr_snapshot;
+                                    string text;
                                     double stamp = snapshots[i].id.tv_sec + (snapshots[i].id.tv_usec / 1e6);
+                                    text = to_string(i) + ": " + to_string(stamp);
                                     ImVec2 p = ImGui::GetCursorScreenPos();
                                     ImVec2 s(ImGui::GetContentRegionAvailWidth(),
                                              ImGui::GetTextLineHeight() + 4);
@@ -1012,7 +1049,7 @@ int main(int, char **) {
                                                                 ImGui::GetColorU32(color), 3.0f);
                                     }
 
-                                    if (ImGui::Selectable(to_string(stamp).c_str(), is_selected)) {
+                                    if (ImGui::Selectable(text.c_str(), is_selected)) {
                                         if (is_selected)
                                             curr_snapshot = -1;
                                         else
@@ -1041,6 +1078,7 @@ int main(int, char **) {
                                 }
                                 ImGui::EndGroup();
                                 ImGui::EndColumns();
+                                ImGui::PopStyleColor(2);
                                 ImGui::PopStyleVar(1);
                                 ImGui::PopItemWidth();
                             }
@@ -1070,7 +1108,7 @@ int main(int, char **) {
                             if (calibrated) {
                                 ImGui::SameLine();
                                 if (MaterialButton("Export", calibrated)) {
-                                    cv::FileStorage fs("calibration.yaml",
+                                    cv::FileStorage fs("~/Desktop/calibration.yaml",
                                                        cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
                                     fs << "image_width" << camera_width;
                                     fs << "image_height" << camera_height;
@@ -1101,6 +1139,7 @@ int main(int, char **) {
                 if (curr_snapshot != -1) {
                     stream_on = false;
                     img = snapshots[curr_snapshot].img;
+                    corners = snapshots[curr_snapshot].corners;
                 } else if (camera.isOpened() && !stream_on) {
                     stream_on = true;
                     camera.grab();
@@ -1162,52 +1201,74 @@ int main(int, char **) {
                 }
             }
 
+            // Positioning && Centering
             ImVec2 pos = ImVec2((width_avail - img.cols) / 2 + ImGui::GetCursorPosX(),
                                 (height_avail - img.rows) / 2 + ImGui::GetCursorPosY());
             ImGui::SetCursorPos(pos);
             ImGui::Image((void *) (intptr_t) texture, ImVec2(img.cols, img.rows));
+            cv::Point2f offset(pos.x + width_parameter_window, pos.y);
 
-            if (!frame_corners.empty() && curr_target < target_frames.size()) {
-                cv::Point2f offset(pos.x + width_parameter_window, pos.y);
-                vector<cv::Point2f> target_corners(target_frames[curr_target]);
+            // Draw Corners
+            if (calibration_mode && !corners.empty()) {
+                if (flip_img && curr_snapshot == -1) {
+                    flipPoints(corners, img_size_old);
+                }
+                for (auto& p : corners) {
+                    p *= scaling;
+                    p += offset;
+                }
+                drawPoints(corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), size * 4.0f);
+            }
+
+            // Draw Frame around checkerboard
+            if (calibration_mode && !frame_corners.empty()) {
                 increaseRectSize(frame_corners, size * 64);
                 if (flip_img) {
                     flipPoints(frame_corners, img_size_old);
-                    flipPoints(target_corners, cv::Size(1, 1));
                 }
 
                 // Convert to img coordinates
-                vector<ImVec2> img_corners;
-                vector<ImVec2> img_target_corners;
+                for (auto& p : frame_corners) {
+                    p *= scaling;
+                    p += offset;
+                }
+                drawRectangle(frame_corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
+            }
+
+            // Draw target frames
+            if (calibration_mode && curr_target < target_frames.size()) {
+                // Convert and flip points
+                vector<cv::Point2f> target_corners(target_frames[curr_target]);
+                if (flip_img) {
+                    flipPoints(target_corners, cv::Size(1, 1));
+                }
+
                 float chkbrd_ratio = (float) chkbrd_cols / (float) chkbrd_rows;
                 float ratio_offset = (img.rows * img_ratio - img.rows * chkbrd_ratio) / 2.0f;
                 for (int i = 0; i < frame_corners.size(); i++) {
-                    frame_corners[i] = frame_corners[i] * scaling + offset;
                     target_corners[i].x = target_corners[i].x * img.rows * chkbrd_ratio + ratio_offset + offset.x;
                     target_corners[i].y = target_corners[i].y * img.rows + offset.y;
-                    img_corners.emplace_back(frame_corners[i].x, frame_corners[i].y);
-                    img_target_corners.emplace_back(target_corners[i].x, target_corners[i].y);
                 }
 
-                double dist = cv::norm((target_corners[0] + (target_corners[2] - target_corners[0]) / 2) -
-                                       (frame_corners[0] + (frame_corners[2] - frame_corners[0]) / 2));
+                if (!corners.empty() && curr_snapshot == -1) {
+                    double dist = cv::norm((target_corners[0] + (target_corners[2] - target_corners[0]) / 2) -
+                                           (frame_corners[0] + (frame_corners[2] - frame_corners[0]) / 2));
+                    double frameArea = cv::contourArea(frame_corners);
+                    double targetArea = cv::contourArea(target_corners);
 
-                ImVec4 col_bg = interp_color((float) dist, 0, img.rows / 2.0f);
-                col_bg.w *= 0.75;
+                    ImVec4 col_bg = interp_color((float) dist, 0, img.rows / 2.0f);
+                    col_bg.w *= max(0.33f, 1.0f - abs(1.0f - (float) frameArea / (float) targetArea));
 
-                drawRectangle(img_corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, true);
-//                drawRectangle(img_target_corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 16.0f, true);
-                double frameArea = cv::contourArea(frame_corners);
-                double targetArea = cv::contourArea(target_corners);
-                if (dist <= size * 64 * scaling && frameArea > targetArea * 0.8f && frameArea < targetArea * 1.2f) {
-                    if (!taking_snapshot) {
-                        taking_snapshot = true;
-//                        ImGuiContext &g = *GImGui;
-//                        g.LastActiveIdTimer = 0;
+                    if (dist <= size * 64 * scaling && frameArea > targetArea * 0.8f && frameArea < targetArea * 1.2f) {
+                        if (!taking_snapshot) {
+                            taking_snapshot = true;
+                        }
+                        drawRectangle(target_corners, ImVec4(0.13f, 0.83f, 0.91f, 1.00f), 24.0f, true);
+                    } else {
+                        taking_snapshot = false;
+                        drawRectangle(target_corners, col_bg, 12.0f, true);
                     }
-                    drawRectangle(img_target_corners, ImVec4(0.13f, 0.83f, 0.91f, 1.00f), 24.0f, true);
-                } else
-                    drawRectangle(img_target_corners, col_bg, 12.0f, false);
+                }
             }
 
             if (reprojection_err != DBL_MAX) {
