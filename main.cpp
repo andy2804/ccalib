@@ -376,7 +376,7 @@ bool BeginCard(const char *label, ImFont *title_font, const float &item_height, 
     ImGui::SetCursorPos(p);
     ImGui::BeginChild(id, frame_bb.GetSize(), true, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
     ImGui::PushFont(title_font);
-    ImGui::Text(label);
+    ImGui::Text("%s", label);
 
     ImGui::PushItemWidth(-1);
 
@@ -543,6 +543,7 @@ int main(int, char **) {
     bool undistort = false;
     bool calibrated = false;
     bool taking_snapshot = false;
+    bool in_target = false;
 
     // camera specific state variables
     int camera_curr = 0;
@@ -853,6 +854,7 @@ int main(int, char **) {
                                 skew = 0.5f;
                                 reprojection_err = DBL_MAX;
                                 undistort = false;
+                                curr_snapshot = -1;
 
                                 snapshots.clear();
                                 instance_errs.clear();
@@ -1011,12 +1013,13 @@ int main(int, char **) {
                                     }
 
                                     taking_snapshot = false;
-                                    curr_target++;
+                                    if (in_target)
+                                        curr_target++;
                                 }
                             }
 
                             ImGui::SameLine();
-                            ImGui::Text(status_text);
+                            ImGui::Text("%s", status_text);
                             CoveredBar(0.0f, movement_ind);
 
                             // List all snapshots
@@ -1232,7 +1235,8 @@ int main(int, char **) {
                     p *= scaling;
                     p += offset;
                 }
-                drawRectangle(frame_corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
+                if (curr_target >= target_frames.size())
+                    drawRectangle(frame_corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
             }
 
             // Draw target frames
@@ -1257,17 +1261,22 @@ int main(int, char **) {
                     double targetArea = cv::contourArea(target_corners);
 
                     ImVec4 col_bg = interp_color((float) dist, 0, img.rows / 2.0f);
-                    col_bg.w *= max(0.33f, 1.0f - abs(1.0f - (float) frameArea / (float) targetArea));
 
                     if (dist <= size * 64 * scaling && frameArea > targetArea * 0.8f && frameArea < targetArea * 1.2f) {
                         if (!taking_snapshot) {
                             taking_snapshot = true;
                         }
+                        in_target = true;
                         drawRectangle(target_corners, ImVec4(0.13f, 0.83f, 0.91f, 1.00f), 24.0f, true);
                     } else {
                         taking_snapshot = false;
+                        in_target = false;
                         drawRectangle(target_corners, col_bg, 12.0f, true);
                     }
+
+                    double area_diff = abs(1.0f - (float) frameArea / (float) targetArea);
+                    col_bg = interp_color((float) area_diff, 0, 1.0f);
+                    drawRectangle(frame_corners, col_bg, 4.0f, true);
                 }
             }
 
@@ -1279,9 +1288,9 @@ int main(int, char **) {
                     reproj_error = "Reprojection Error: " + to_string(instance_errs[curr_snapshot]);
                 float text_width = ImGui::CalcTextSize(reproj_error.c_str()).x;
                 ImGui::SetCursorPos(ImVec2(pos.x + img.cols - text_width - 16, pos.y + 17));
-                ImGui::TextColored(ImColor(0, 0, 0, 255), reproj_error.c_str());
+                ImGui::TextColored(ImColor(0, 0, 0, 255), "%s", reproj_error.c_str());
                 ImGui::SetCursorPos(ImVec2(pos.x + img.cols - text_width - 16, pos.y + 16));
-                ImGui::TextColored(ImColor(255, 255, 255, 255), reproj_error.c_str());
+                ImGui::TextColored(ImColor(255, 255, 255, 255), "%s", reproj_error.c_str());
             }
 
             ImGui::End();
