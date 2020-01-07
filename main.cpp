@@ -63,7 +63,7 @@ constexpr uint32_t fourcc(char const p[5]) {
 bool findCorners(cv::Mat &img, vector<cv::Point2f> &corners, const int &cols, const int &rows) {
     if (cv::findChessboardCorners(img, cv::Size(cols - 1, rows - 1), corners,
                                   CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE |
-                                  CV_CALIB_CB_FAST_CHECK | CV_CALIB_CB_FILTER_QUADS)) {
+                                  CV_CALIB_CB_FAST_CHECK)) {
         cv::cornerSubPix(img, corners, cv::Size(11, 11), cv::Size(-1, -1),
                          cv::TermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 30, 0.1));
         return true;
@@ -1111,7 +1111,7 @@ int main(int, char **) {
                             if (calibrated) {
                                 ImGui::SameLine();
                                 if (MaterialButton("Export", calibrated)) {
-                                    cv::FileStorage fs("~/Desktop/calibration.yaml",
+                                    cv::FileStorage fs("calibration.yaml",
                                                        cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
                                     fs << "image_width" << camera_width;
                                     fs << "image_height" << camera_height;
@@ -1120,7 +1120,13 @@ int main(int, char **) {
                                     fs << "distortion_model" << "plumb_bob";
                                     fs << "distortion_coefficients" << D;
                                     fs << "rectification_matrix" << cv::Mat::eye(3, 3, CV_64F);
-//                                    fs << "projection_matrix" << K.mul(cv::Mat::eye(3, 4, CV_64F));
+                                    cv::Mat P;
+                                    cv::hconcat(K, cv::Mat::zeros(3, 1, CV_64F), P);
+                                    fs << "projection_matrix" << P;
+                                    fs.release();
+
+                                    ImGui::SameLine();
+                                    ImGui::Text("Exported!");
                                 }
                                 stringstream result_ss;
                                 result_ss << "K = " << K << endl << endl;
