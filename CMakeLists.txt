@@ -10,34 +10,35 @@ find_package(OpenGL REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(OpenCV REQUIRED)
 
-add_library("glad" "glad/src/glad.c")
+add_library("glad" "include/glad/src/glad.c")
 
 include_directories(
     ${SDL2_INCLUDE_DIRS}
     ${OPENGL_INCLUDE_DIR}
-    "glad/include"
+    "include/glad/include"
+    "include"
 )
 
 set(sources
-    imgui/imconfig.h
-    imgui/imgui.cpp
-    imgui/imgui.h
-    imgui/imgui_demo.cpp
-    imgui/imgui_draw.cpp
-    imgui/imgui_internal.h
-    imgui/imgui_widgets.cpp
-    imgui/imstb_rectpack.h
-    imgui/imstb_textedit.h
-    imgui/imstb_truetype.h
-    imgui/imgui_impl_opengl3.cpp
-    imgui/imgui_impl_opengl3.h
-    imgui/imgui_impl_sdl.cpp
-    imgui/imgui_impl_sdl.h
-        camera.cpp
-        include/camera.h
+    include/imgui/imconfig.h
+    include/imgui/imgui.cpp
+    include/imgui/imgui.h
+    include/imgui/imgui_demo.cpp
+    include/imgui/imgui_draw.cpp
+    include/imgui/imgui_internal.h
+    include/imgui/imgui_widgets.cpp
+    include/imgui/imstb_rectpack.h
+    include/imgui/imstb_textedit.h
+    include/imgui/imstb_truetype.h
+    include/imgui/imgui_impl_opengl3.cpp
+    include/imgui/imgui_impl_opengl3.h
+    include/imgui/imgui_impl_sdl.cpp
+    include/imgui/imgui_impl_sdl.h
+        src/camera.cpp
+        src/camera.h
     )
 
-add_executable(ccalib main.cpp ${sources})
+add_executable(ccalib src/main.cpp ${sources})
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
         "glad"

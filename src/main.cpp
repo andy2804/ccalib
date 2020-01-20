@@ -6,7 +6,7 @@
 #include "imgui/imgui_impl_sdl.h"
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui_internal.h"
-#include "include/camera.h"
+#include "camera.h"
 #include <ctime>
 #include <stdio.h>
 #include <vector>
