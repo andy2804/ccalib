@@ -8,6 +8,7 @@
 #include <string>
 #include <linux/videodev2.h>
 #include <opencv2/opencv.hpp>
+#include <thread>
 #include "structures.cpp"
 
 namespace ccalib {
@@ -15,6 +16,8 @@ namespace ccalib {
     class Camera {
     private:
         cv::VideoCapture camera;
+        bool cameraOn = false;
+        bool streamOn = false;
 
     public:
         ccalib::CameraParameters params;
@@ -23,19 +26,29 @@ namespace ccalib {
 
         ~Camera();
 
-        void init();
-
-        void setFramerate(int fps);
+        void connect();
 
         void startStream();
 
         void stopStream();
 
-        void closeConnection();
-
-        cv::Mat captureRawFrame();
-
         void release();
+
+        void updateParameters();
+
+        uint32_t fourcc(const char *p);
+
+        void grab();
+
+        void captureFrame(cv::Mat &destination);
+
+        void updateResolution(const int &width, const int &height);
+
+        void updateExposure(const float &exposure);
+
+        void updateFramerate(const int &fps);
+
+        void updateFormat(const std::string &format);
     };
 
 } // namespace ccalib

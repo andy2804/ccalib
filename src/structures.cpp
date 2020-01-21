@@ -56,7 +56,7 @@ namespace ccalib {
     struct CalibrationParameters {
         cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
         cv::Mat D = cv::Mat::zeros(8, 1, CV_64F);
-        cv::Mat P = cv::Mat::zeros(4, 3, CV_64F);
+        cv::Mat P = cv::Mat::zeros(3, 4, CV_64F);
         vector<cv::Mat> R, T;
         double reprojection_err = DBL_MAX;
     };
