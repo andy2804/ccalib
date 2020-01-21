@@ -646,7 +646,7 @@ int main(int, char **) {
             cameras.push_back(entry.path());
     }
 
-    // Try to open camera connection
+    // Try to open connection to first camera in device list
     cv::VideoCapture camera(camera_curr);
     if (!camera.isOpened())
         CV_Assert("Cam open failed");

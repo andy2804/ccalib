@@ -8,30 +8,36 @@
 #include <string>
 #include <linux/videodev2.h>
 #include <opencv2/opencv.hpp>
+#include "structures.cpp"
 
-class V4L2Camera {
-    int fd;
-    std::string device;
-    struct v4l2_capability cap;
-    struct v4l2_format format;
-    struct v4l2_buffer buffer;
-    cv::Mat raw_input;
+namespace ccalib {
 
-public:
-    int width;
-    int height;
-    timeval last_ts;
+    class Camera {
+    private:
+        cv::VideoCapture camera;
 
-    V4L2Camera();
-    V4L2Camera(std::string device_address, int width, int height);
-    ~V4L2Camera();
-    void init();
-    void setFramerate(int fps);
-    void allocateBuffer();
-    void startStream();
-    void stopStream();
-    void closeConnection();
-    cv::Mat captureRawFrame();
-};
+    public:
+        ccalib::CameraParameters params;
+
+        Camera(const std::string &device_address);
+
+        ~Camera();
+
+        void init();
+
+        void setFramerate(int fps);
+
+        void startStream();
+
+        void stopStream();
+
+        void closeConnection();
+
+        cv::Mat captureRawFrame();
+
+        void release();
+    };
+
+} // namespace ccalib
 
 #endif
