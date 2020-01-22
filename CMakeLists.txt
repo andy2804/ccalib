@@ -4,7 +4,7 @@ project(ccalib)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "-std=c++17 -lstdc++fs")
+set(CMAKE_CXX_FLAGS "-std=c++17 -lstdc++fs -pthread")
 
 find_package(OpenGL REQUIRED)
 find_package(SDL2 REQUIRED)
@@ -36,6 +36,7 @@ set(sources
     include/imgui/imgui_impl_sdl.h
         src/camera.cpp
         src/camera.h
+        src/structures.cpp
     )
 
 add_executable(ccalib src/main.cpp ${sources})

@@ -2,12 +2,14 @@
 // Created by andya on 21.01.20.
 //
 
+#include <opencv2/core/mat.hpp>
+
 namespace ccalib {
 
     struct Snapshot {
         timeval id;
         cv::Mat img;
-        vector <cv::Point2f> corners;
+        std::vector<cv::Point2f> corners;
         float x, y, size, skew;
     };
 
@@ -17,8 +19,8 @@ namespace ccalib {
         float exposure;
         bool autoExposure;
         int framerate;
-        string format;
-        string device;
+        std::string format;
+        std::string device;
     };
 
     struct GUIStateVariables {
@@ -57,7 +59,7 @@ namespace ccalib {
         cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
         cv::Mat D = cv::Mat::zeros(8, 1, CV_64F);
         cv::Mat P = cv::Mat::zeros(3, 4, CV_64F);
-        vector<cv::Mat> R, T;
+        std::vector<cv::Mat> R, T;
         double reprojection_err = DBL_MAX;
     };
 

@@ -7,7 +7,6 @@
 #include <iostream>
 #include <string>
 #include <stdio.h>
-#include "structures.cpp"
 
 #include <opencv2/opencv.hpp>
 #include <thread>
@@ -49,7 +48,7 @@ namespace ccalib {
         // Open camera connection
         camera.open(params.device);
         if (!camera.isOpened())
-            printf("Camera %s could not be opened!", params.device);
+            printf("Camera %s could not be opened!", params.device.c_str());
         cameraOn = true;
 
         // Update parameters
@@ -111,7 +110,7 @@ namespace ccalib {
         // Activate streaming
         if (cameraOn) {
             streamOn = true;
-            std::thread t(grab);
+            std::thread t(&Camera::grab, this);
             t.detach();
         }
     }
