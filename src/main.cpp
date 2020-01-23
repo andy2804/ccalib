@@ -7,6 +7,8 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui_internal.h"
 #include "camera.h"
+#include "structures.h"
+
 #include <ctime>
 #include <stdio.h>
 #include <vector>
@@ -314,7 +316,8 @@ void drawPoints(const vector<cv::Point2f> &corners, const ImVec4 &color, const f
     for (int i = 0; i < corners.size(); i++) {
         draw_list->AddCircleFilled(ImVec2(corners[i].x, corners[i].y), size, col_bg);
         draw_list->AddCircle(ImVec2(corners[i].x, corners[i].y), size * 4.0f, col_bg, 12, size);
-        draw_list->AddText(ImVec2(corners[i].x + size * 5.0f, corners[i].y + size * 5.0f), col_bg, to_string(i + 1).c_str());
+        draw_list->AddText(ImVec2(corners[i].x + size * 5.0f, corners[i].y + size * 5.0f), col_bg,
+                           to_string(i + 1).c_str());
     }
 }
 
@@ -536,9 +539,8 @@ int main(int, char **) {
     bool show_snapshots_card = true;
     bool show_result_card = true;
     bool calibration_mode = false;
-    bool camera_on = false;
-    bool stream_on = false;
     bool changed = false;
+    bool cameraOn = false;
     bool flip_img = false;
     bool undistort = false;
     bool calibrated = false;
@@ -554,6 +556,15 @@ int main(int, char **) {
     int camera_actfps = 30;
     int camera_currfps = 4;
     int camera_currfmt = 0;
+
+    ccalib::CameraParameters camParams;
+    camParams.width = 640;
+    camParams.height = 480;
+    camParams.ratio = (double) camParams.width / (double) camParams.height;
+    camParams.exposure = 0.333;
+    camParams.framerate = 30;
+    camParams.autoExposure = false;
+    camParams.format = "YUVY";
 
     // Calibration specific state variables
     int chkbrd_rows = 8;
@@ -624,9 +635,11 @@ int main(int, char **) {
 
 
     // UI specific variables
-    float img_ratio = (float) camera_width / (float) camera_height;
     int width_parameter_window = 350;
     float spacing = (width_parameter_window - ImGui::GetStyle().WindowPadding.x * 2) / 2;
+
+    // Camera Formats
+    // TODO Use v4l2 VIDIOC_ENUM_FMT to read out all valid formats
     vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
     vector<string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
     cv::Mat img = cv::Mat::zeros(cv::Size(camera_width, camera_height), CV_8UC3);
@@ -647,9 +660,7 @@ int main(int, char **) {
     }
 
     // Try to open connection to first camera in device list
-    cv::VideoCapture camera(camera_curr);
-    if (!camera.isOpened())
-        CV_Assert("Cam open failed");
+    ccalib::Camera cam(cameras[camera_curr], camParams);
 
 
     // Main loop
@@ -700,6 +711,11 @@ int main(int, char **) {
                             for (int i = 0; i < cameras.size(); i++) {
                                 bool is_selected = (cameras[camera_curr] == cameras[i]);
                                 if (ImGui::Selectable(cameras[i].c_str(), is_selected)) {
+                                    if (cameraOn) {
+                                        cam.stopStream();
+                                        cam.close();
+                                        cameraOn = false;
+                                    }
                                     camera_curr = i;
                                 }
                                 if (is_selected) {
@@ -712,23 +728,15 @@ int main(int, char **) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Stream");
                         ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-                        ToggleButton("##cam_toggle", &camera_on, !camera_on);
-                        if (camera_on && ImGui::IsItemClicked(0)) {
-                            camera.open(camera_curr);
-                            camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
-                            camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
-                            camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
-
-                            camera.set(CV_CAP_PROP_AUTO_EXPOSURE, 0.25);
-                            camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure);
-                            camera.grab();
-                            camera.retrieve(img);
-
-                            stream_on = true;
+                        ToggleButton("##cam_toggle", &cameraOn, !cameraOn);
+                        if (cameraOn && ImGui::IsItemClicked(0)) {
+                            cam.open();
+                            cam.updateParameters(camParams);
+                            cam.startStream();
                             changed = true;
-                        } else if (!camera_on) {
-                            camera.release();
-                            stream_on = false;
+                        } else if (!cameraOn & ImGui::IsItemClicked(0)) {
+                            cam.stopStream();
+                            cam.close();
                         }
 
                         ImGui::AlignTextToFramePadding();
@@ -752,19 +760,18 @@ int main(int, char **) {
                         ImGui::Text("Resolution");
                         ImGui::SameLine(spacing);
                         ImGui::PushItemWidth(44);
-                        ImGui::InputInt("##width", &camera_width, 0);
+                        ImGui::InputDouble("##width", &camParams.width, 0, 0, "%.0f");
                         ImGui::SameLine();
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("x");
                         ImGui::SameLine();
-                        ImGui::InputInt("##height", &camera_height, 0);
+                        ImGui::InputDouble("##height", &camParams.height, 0, 0, "%.0f");
                         ImGui::PopItemWidth();
                         const char *button_text = "Set";
                         ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
                                         style.FramePadding.x);
                         if (MaterialButton(button_text)) {
-                            camera.set(CV_CAP_PROP_FRAME_WIDTH, (double) camera_width);
-                            camera.set(CV_CAP_PROP_FRAME_HEIGHT, (double) camera_height);
+                            cam.updateResolution(camParams.width, camParams.height);
                             changed = true;
                         }
 
@@ -776,7 +783,10 @@ int main(int, char **) {
                                 bool is_selected = (camera_fps[camera_currfps] == camera_fps[i]);
                                 if (ImGui::Selectable(to_string(camera_fps[i]).c_str(), is_selected)) {
                                     camera_currfps = i;
-                                    camera.set(CV_CAP_PROP_FPS, (double) camera_fps[camera_currfps]);
+                                    if (!ImGui::IsMouseClicked(0)) {
+                                        camParams.framerate = (double) camera_fps[camera_currfps];
+                                        cam.updateFramerate(camParams.framerate);
+                                    }
                                 }
                                 if (is_selected)
                                     ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
@@ -788,8 +798,8 @@ int main(int, char **) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Exposure Time");
                         ImGui::SameLine(spacing);
-                        if (ImGui::SliderFloat("##camera_exptime", &camera_exposure, 0, 1, "%.3f", 2.0)) {
-                            camera.set(CV_CAP_PROP_EXPOSURE, camera_exposure / 1.25);
+                        if (ImGui::SliderFloat("##camera_exptime", &camParams.exposure, 0, 1, "%.3f", 2.0)) {
+                            cam.updateExposure(camParams.exposure);
                         }
 
                         ImGui::AlignTextToFramePadding();
@@ -800,7 +810,10 @@ int main(int, char **) {
                                 bool is_selected = (camera_fmt[camera_currfmt] == camera_fmt[i]);
                                 if (ImGui::Selectable(camera_fmt[i].c_str(), is_selected)) {
                                     camera_currfmt = i;
-                                    camera.set(CV_CAP_PROP_FOURCC, fourcc(camera_fmt[camera_currfmt].c_str()));
+                                    if (!ImGui::IsMouseClicked(0)) {
+                                        camParams.format = camera_fmt[camera_currfmt];
+                                        cam.updateFormat(camParams.format );
+                                    }
                                 }
                                 if (is_selected)
                                     ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
@@ -835,9 +848,9 @@ int main(int, char **) {
                         const char *button_text = calibration_mode ? "Reset" : "Start";
                         ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
                                         style.FramePadding.x);
-                        if (MaterialButton(button_text, !calibration_mode && stream_on)) {
+                        if (MaterialButton(button_text, !calibration_mode && cam.isStreaming())) {
                             calibration_mode = !calibration_mode;
-                            if (camera_on && calibration_mode) {
+                            if (cameraOn && calibration_mode) {
                                 x_min = camera_width;
                                 x_max = 0;
                                 y_min = camera_height;
@@ -861,7 +874,7 @@ int main(int, char **) {
                             }
                         }
 
-                        if (!camera_on)
+                        if (!cameraOn)
                             calibration_mode = false;
 
                         EndCard();
@@ -869,22 +882,16 @@ int main(int, char **) {
                     ImGui::EndTabItem();
                 }
 
-                if (changed && camera_on) {
+                if (changed) {
                     // Update params
-                    camera.grab();
-                    camera.retrieve(img);
-                    camera_width = img.cols;
-                    camera_height = img.rows;
-                    img_ratio = (float) camera_width / (float) camera_height;
-                    camera_actfps = camera.get(CV_CAP_PROP_FPS);
+                    camParams = cam.getParameters();
                     for (int i = 0; i < camera_fps.size(); i++)
                         camera_currfps = (camera_fps[i] == camera_actfps) ? i : camera_currfps;
                     changed = false;
                 }
 
-                if (stream_on) {
-                    camera.grab();
-                    camera.retrieve(img);
+                if (cam.isStreaming()) {
+                    cam.captureFrame(img);
                     cv::cvtColor(img, img, CV_BGR2RGB);
                 }
 
@@ -896,7 +903,7 @@ int main(int, char **) {
                     if (ImGui::BeginTabItem("Calibration")) {
 
                         // Detect Checkerboard
-                        if (stream_on) {
+                        if (cam.isStreaming()) {
                             cv::Mat gray(img.rows, img.cols, CV_8UC1);
                             cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
                             cv::cvtColor(gray, img, cv::COLOR_GRAY2RGB);
@@ -957,7 +964,7 @@ int main(int, char **) {
                             // Collect snapshot button
                             // TODO automatic collection of snapshots
                             const char *status_text;
-                            if (MaterialButton("Snapshot", !calibrated && snapshots.size() < 4) && stream_on)
+                            if (MaterialButton("Snapshot", !calibrated && snapshots.size() < 4) && cam.isStreaming())
                                 taking_snapshot = true;
 
                             if (taking_snapshot)
@@ -968,7 +975,7 @@ int main(int, char **) {
                                 status_text = "No Checkerboard detected!";
                             float movement_ind = 0.0f;
 
-                            if (stream_on && corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
+                            if (cam.isStreaming() && corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
                                 // Compare actual frame with previous frame for movement
                                 cv::Rect rect = cv::minAreaRect(corners).boundingRect();
                                 cv::Mat old_img;
@@ -1146,24 +1153,16 @@ int main(int, char **) {
                 ImGui::EndTabBar();
 
                 if (curr_snapshot != -1) {
-                    stream_on = false;
                     img = snapshots[curr_snapshot].img;
                     corners = snapshots[curr_snapshot].corners;
-                } else if (camera.isOpened() && !stream_on) {
-                    stream_on = true;
-                    camera.grab();
-                    camera.retrieve(img);
+                } else if (cam.isOpened() && !cam.isStreaming()) {
+                    cam.captureFrame(img);
                     cv::cvtColor(img, img, CV_BGR2RGB);
                 }
             }
 
             img.copyTo(img_prev);
 
-//            ImGui::SetCursorPosY(
-//                    max(0.0f, (ImGui::GetContentRegionMax().y - min(0.0f, ImGui::GetContentRegionAvail().y) -
-//                               ImGui::GetFontSize() + ImGui::GetScrollY())));
-//            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-//                        ImGui::GetIO().Framerate);
             ImGui::End();
         }
 
@@ -1181,8 +1180,8 @@ int main(int, char **) {
                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                          ImGuiWindowFlags_NoTitleBar);
 
-            if (camera_on) {
-                if (stream_on) {
+            if (cameraOn) {
+                if (cam.isStreaming()) {
                     if (flip_img)
                         cv::flip(img, img, 1);
                     if (undistort) {
@@ -1201,12 +1200,12 @@ int main(int, char **) {
             float scaling = 1.0f;
             cv::Size img_size_old(img.cols, img.rows);
             if (!img.empty()) {
-                if (height_avail * img_ratio > width_avail) {
+                if (height_avail * camParams.ratio > width_avail) {
                     scaling = width_avail / img.cols;
-                    cv::resize(img, img, cv::Size((int) width_avail, (int) (width_avail / img_ratio)));
+                    cv::resize(img, img, cv::Size((int) width_avail, (int) (width_avail / camParams.ratio)));
                 } else {
                     scaling = height_avail / img.rows;
-                    cv::resize(img, img, cv::Size((int) (height_avail * img_ratio), (int) height_avail));
+                    cv::resize(img, img, cv::Size((int) (height_avail * camParams.ratio), (int) height_avail));
                 }
             }
 
@@ -1222,7 +1221,7 @@ int main(int, char **) {
                 if (flip_img && curr_snapshot == -1) {
                     flipPoints(corners, img_size_old);
                 }
-                for (auto& p : corners) {
+                for (auto &p : corners) {
                     p *= scaling;
                     p += offset;
                 }
@@ -1237,7 +1236,7 @@ int main(int, char **) {
                 }
 
                 // Convert to img coordinates
-                for (auto& p : frame_corners) {
+                for (auto &p : frame_corners) {
                     p *= scaling;
                     p += offset;
                 }
@@ -1254,7 +1253,7 @@ int main(int, char **) {
                 }
 
                 float chkbrd_ratio = (float) chkbrd_cols / (float) chkbrd_rows;
-                float ratio_offset = (img.rows * img_ratio - img.rows * chkbrd_ratio) / 2.0f;
+                float ratio_offset = (img.rows * (float) camParams.ratio - img.rows * chkbrd_ratio) / 2.0f;
                 for (int i = 0; i < frame_corners.size(); i++) {
                     target_corners[i].x = target_corners[i].x * img.rows * chkbrd_ratio + ratio_offset + offset.x;
                     target_corners[i].y = target_corners[i].y * img.rows + offset.y;

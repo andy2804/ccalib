@@ -9,46 +9,64 @@
 #include <linux/videodev2.h>
 #include <opencv2/opencv.hpp>
 #include <thread>
-#include "structures.cpp"
+#include "structures.h"
 
 namespace ccalib {
 
     class Camera {
     private:
-        cv::VideoCapture camera;
-        bool cameraOn = false;
         bool streamOn = false;
+        bool streamFlag = false;
+        std::string device = "/dev/video0";
+        cv::VideoCapture camera;
+        cv::Mat image;
 
     public:
         ccalib::CameraParameters params;
+
+        Camera();
+
+        Camera(const std::string &device_address, const CameraParameters &camParams);
 
         Camera(const std::string &device_address);
 
         ~Camera();
 
-        void connect();
+        void open();
 
         void startStream();
 
         void stopStream();
 
-        void release();
+        void close();
 
         void updateParameters();
 
-        uint32_t fourcc(const char *p);
+        constexpr uint32_t fourcc(const char *p);
 
         void grab();
 
         void captureFrame(cv::Mat &destination);
 
-        void updateResolution(const int &width, const int &height);
+        void updateResolution(const double &width, const double &height);
 
         void updateExposure(const float &exposure);
 
-        void updateFramerate(const int &fps);
+        void updateFramerate(const double &fps);
 
         void updateFormat(const std::string &format);
+
+        void updateParameters(CameraParameters &newParams);
+
+        bool isOpened();
+
+        bool isStreaming();
+
+        CameraParameters getParameters();
+
+        double getRatio();
+
+        void open(const std::string &device_address);
     };
 
 } // namespace ccalib

@@ -2,6 +2,9 @@
 // Created by andya on 21.01.20.
 //
 
+#ifndef STRUCTURES_H
+#define STRUCTURES_H
+
 #include <opencv2/core/mat.hpp>
 
 namespace ccalib {
@@ -14,13 +17,13 @@ namespace ccalib {
     };
 
     struct CameraParameters {
-        int width;
-        int height;
-        float exposure;
         bool autoExposure;
-        int framerate;
+        float exposure;
+        double width;
+        double height;
+        double ratio;
+        double framerate;
         std::string format;
-        std::string device;
     };
 
     struct GUIStateVariables {
@@ -64,3 +67,5 @@ namespace ccalib {
     };
 
 } // namespace ccalib
+
+#endif // STRUCTURES_H

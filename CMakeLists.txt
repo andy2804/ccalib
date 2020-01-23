@@ -36,7 +36,7 @@ set(sources
     include/imgui/imgui_impl_sdl.h
         src/camera.cpp
         src/camera.h
-        src/structures.cpp
+        src/structures.h
     )
 
 add_executable(ccalib src/main.cpp ${sources})
