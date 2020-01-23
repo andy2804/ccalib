@@ -9,6 +9,8 @@
 
 namespace ccalib {
 
+    void StyleColorsMaterial();
+
     void ToggleButton(const char *str_id, bool *v, const bool focus = false);
 
     void CoveredBar(const float &start, const float &stop, const float &indicator = -1);
