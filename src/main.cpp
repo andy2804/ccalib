@@ -983,24 +983,20 @@ int main(int, char **) {
         // Rendering
         ImGui::Render();
         glViewport(0, 0, (int) io.DisplaySize.x, (int) io.DisplaySize.y);
-//        glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
     }
 
-// Cleanup
+    // Cleanup ImGui
     ImGui_ImplOpenGL3_Shutdown();
-
     ImGui_ImplSDL2_Shutdown();
-
     ImGui::DestroyContext();
 
+    // Cleanup SDL
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
-
     SDL_Quit();
 
     return 0;
 }
-
