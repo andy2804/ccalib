@@ -8,6 +8,8 @@
 #include "imgui/imgui_internal.h"
 #include "camera.h"
 #include "structures.h"
+#include "functions.h"
+#include "imgui_extensions.h"
 
 #include <ctime>
 #include <stdio.h>
@@ -56,10 +58,6 @@ void mat2Texture(cv::Mat &image, GLuint &imageTexture) {
                      GL_UNSIGNED_BYTE,    // Image data type
                      image.ptr());        // The actual image data itself
     }
-}
-
-constexpr uint32_t fourcc(char const p[5]) {
-    return (((p[0]) & 255) + (((p[1]) & 255) << 8) + (((p[2]) & 255) << 16) + (((p[3]) & 255) << 24));
 }
 
 bool findCorners(cv::Mat &img, vector<cv::Point2f> &corners, const int &cols, const int &rows) {
@@ -152,255 +150,6 @@ void increaseRectSize(vector<cv::Point2f> &corners, const float &padding) {
         corners[i] += (dir[i] * (padding / cv::norm(dir[i])));
         corners[i] += (dir2[i] * (padding / cv::norm(dir2[i])));
     }
-}
-
-void ToggleButton(const char *str_id, bool *v, const bool focus = false) {
-    ImVec2 p = ImGui::GetCursorScreenPos();
-    ImDrawList *draw_list = ImGui::GetWindowDrawList();
-
-    float height = ImGui::GetFrameHeight() * 0.8f;
-    float width = height * 1.8f;
-    float radius = height * 0.50f;
-    p.y += 0.1f * ImGui::GetFrameHeight();
-
-    ImGui::InvisibleButton(str_id, ImVec2(width, height));
-    if (ImGui::IsItemClicked())
-        *v = !*v;
-
-    float t = *v ? 1.0f : 0.0f;
-
-    ImGuiContext &g = *GImGui;
-    float ANIM_SPEED = 0.08f;
-    if (g.LastActiveId == g.CurrentWindow->GetID(str_id))// && g.LastActiveIdTimer < ANIM_SPEED)
-    {
-        float t_anim = ImSaturate(g.LastActiveIdTimer / ANIM_SPEED);
-        t = *v ? (t_anim) : (1.0f - t_anim);
-    }
-
-    // Draw rectangle if focused
-    ImU32 col_bg;
-    if (focus) {
-        float padding = 1.7f;
-        float margin = 0.0f;
-        float ANIM_SPEED = 0.32f;
-        float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
-        col_bg = ImGui::GetColorU32(
-                ImLerp(ImVec4(0.56f, 0.83f, 0.26f, 1.0f), ImVec4(0.72f, 0.91f, 0.42f, 1.0f), t_anim));
-
-        draw_list->AddRect(ImVec2(p.x - padding - margin, p.y - padding - margin),
-                           ImVec2(p.x + width + padding + margin, p.y + height + padding + margin), col_bg,
-                           height * 0.5f,
-                           ImDrawCornerFlags_All, padding * 2);
-    }
-
-    if (ImGui::IsItemHovered())
-        col_bg = ImGui::GetColorU32(ImLerp(ImVec4(0.78f, 0.78f, 0.78f, 1.0f), ImVec4(0.64f, 0.83f, 0.34f, 1.0f), t));
-    else
-        col_bg = ImGui::GetColorU32(ImLerp(ImVec4(0.85f, 0.85f, 0.85f, 1.0f), ImVec4(0.56f, 0.83f, 0.26f, 1.0f), t));
-
-    draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height), col_bg, height * 0.5f);
-    draw_list->AddCircleFilled(ImVec2(p.x + radius + t * (width - radius * 2.0f), p.y + radius), radius - 1.5f,
-                               IM_COL32(255, 255, 255, 255));
-}
-
-void CoveredBar(const float &start, const float &stop, const float &indicator = -1) {
-    ImVec2 p = ImGui::GetCursorScreenPos();
-    ImDrawList *draw_list = ImGui::GetWindowDrawList();
-
-    float height = ImGui::GetFrameHeight() * 0.25f;
-    float width = ImGui::GetContentRegionAvailWidth();
-    p.y += 0.375f * ImGui::GetFrameHeight();
-
-    draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height),
-                             ImGui::GetColorU32(ImVec4(0.78f, 0.78f, 0.78f, 1.0f)), height * 0.5f);
-    if (stop > start) {
-        draw_list->AddRectFilled(ImVec2(p.x + max(0.0f, start) * width, p.y),
-                                 ImVec2(p.x + min(1.0f, stop) * width, p.y + height),
-                                 ImGui::GetColorU32(ImVec4(0.56f, 0.83f, 0.26f, 1.0f)), height * 0.5f);
-    }
-
-    if (indicator >= 0) {
-        draw_list->AddCircleFilled(ImVec2(p.x + indicator * width, p.y + height / 2.0f), height + 1.5f,
-                                   ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 0.1f)));
-        draw_list->AddCircleFilled(ImVec2(p.x + indicator * width, p.y + height / 2.0f), height,
-                                   ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
-    }
-
-    ImGui::InvisibleButton("##covered_bar", ImVec2(width, ImGui::GetFrameHeight()));
-}
-
-bool MaterialButton(const char *label, bool focus = false, const ImVec2 &size = ImVec2(0, 0)) {
-    // Get Position and Drawlist
-    ImVec2 p = ImGui::GetCursorScreenPos();
-    ImDrawList *draw_list = ImGui::GetWindowDrawList();
-
-
-    // Draw button
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.56f, 0.83f, 0.26f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.48f, 0.75f, 0.18f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-
-    bool clicked = ImGui::Button(label, size);
-    float height = ImGui::GetItemRectSize().y;
-    float width = ImGui::GetItemRectSize().x;
-
-    ImGui::PopStyleColor(3);
-
-    // Draw rectangle if focused
-    if (focus) {
-        ImU32 col_bg;
-        ImGuiContext &g = *GImGui;
-        float padding = 1.0f;
-        float ANIM_SPEED = 0.32f;
-        float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
-        col_bg = ImGui::GetColorU32(
-                ImLerp(ImVec4(0.56f, 0.83f, 0.26f, 1.0f), ImVec4(0.72f, 0.91f, 0.42f, 1.0f), t_anim));
-
-        draw_list->AddRect(ImVec2(p.x - padding, p.y - padding),
-                           ImVec2(p.x + width + padding, p.y + height + padding), col_bg,
-                           ImGui::GetStyle().FrameRounding,
-                           ImDrawCornerFlags_All, padding * 2);
-    }
-
-    return clicked;
-}
-
-void drawRectangle(const vector<cv::Point2f> &corners, const ImVec4 &color, const float &thickness = 1.0f,
-                   bool focus = false) {
-    // Get Position and Drawlist
-    ImDrawList *draw_list = ImGui::GetWindowDrawList();
-    ImGuiContext &g = *GImGui;
-    ImU32 col_bg;
-
-    // Draw rectangle if focused
-    if (focus) {
-        float ANIM_SPEED = 0.32f;
-        float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
-        const ImVec4 color_dark = ImVec4(ImSaturate(color.x * 0.8f), ImSaturate(color.y * 0.8f),
-                                         ImSaturate(color.z * 0.8f), ImSaturate(color.w * 0.8f));
-        const ImVec4 color_bright = ImVec4(ImSaturate(color.x * 1.2f), ImSaturate(color.y * 1.2f),
-                                           ImSaturate(color.z * 1.2f), ImSaturate(color.w * 1.2f));
-        col_bg = ImGui::GetColorU32(ImLerp(color_dark, color_bright, t_anim));
-    } else
-        col_bg = ImGui::GetColorU32(color);
-
-    // Draw Rectangle
-    ImVec2 im_corners[corners.size()];
-    for (int i = 0; i < corners.size(); i++) {
-        im_corners[i].x = corners[i].x;
-        im_corners[i].y = corners[i].y;
-    }
-    draw_list->AddPolyline(im_corners, IM_ARRAYSIZE(im_corners), col_bg, true, thickness);
-//    draw_list->AddQuad(corners[0], corners[1], corners[2], corners[3], col_bg, thickness);
-}
-
-void drawPoints(const vector<cv::Point2f> &corners, const ImVec4 &color, const float &size = 1.0f, bool focus = false) {
-    // Get Position and Drawlist
-    ImDrawList *draw_list = ImGui::GetWindowDrawList();
-    ImGuiContext &g = *GImGui;
-    ImU32 col_bg;
-
-    // Draw rectangle if focused
-    if (focus) {
-        float ANIM_SPEED = 0.32f;
-        float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
-        const ImVec4 color_dark = ImVec4(ImSaturate(color.x * 0.8f), ImSaturate(color.y * 0.8f),
-                                         ImSaturate(color.z * 0.8f), ImSaturate(color.w * 0.8f));
-        const ImVec4 color_bright = ImVec4(ImSaturate(color.x * 1.2f), ImSaturate(color.y * 1.2f),
-                                           ImSaturate(color.z * 1.2f), ImSaturate(color.w * 1.2f));
-        col_bg = ImGui::GetColorU32(ImLerp(color_dark, color_bright, t_anim));
-    } else
-        col_bg = ImGui::GetColorU32(color);
-
-    // Draw Rectangle
-    for (int i = 0; i < corners.size(); i++) {
-        draw_list->AddCircleFilled(ImVec2(corners[i].x, corners[i].y), size, col_bg);
-        draw_list->AddCircle(ImVec2(corners[i].x, corners[i].y), size * 4.0f, col_bg, 12, size);
-        draw_list->AddText(ImVec2(corners[i].x + size * 5.0f, corners[i].y + size * 5.0f), col_bg,
-                           to_string(i + 1).c_str());
-    }
-}
-
-bool BeginCard(const char *label, ImFont *title_font, const float &item_height, bool &visible) {
-    ImGuiWindow *window = ImGui::GetCurrentWindow();
-    if (window->SkipItems)
-        return false;
-
-    ImGuiContext &g = *GImGui;
-    const ImGuiStyle &style = g.Style;
-    const ImGuiID id = ImGui::GetID(label);
-    ImVec2 item_size = ImVec2(ImGui::GetContentRegionAvailWidth(),
-                              ImGui::GetFrameHeightWithSpacing() * item_height);
-    ImVec2 label_size = title_font->CalcTextSizeA(title_font->FontSize, FLT_MAX, -1.0f, label);
-    label_size.x = item_size.x;
-    label_size.y += style.ItemSpacing.y * 2;
-
-    float t = visible ? 1.0f : 0.0f;
-    float ANIM_SPEED = 0.16f;
-    if (g.LastActiveId == id) {
-        float t_anim = g.LastActiveIdTimer / ANIM_SPEED;
-        if (t_anim > 1.0f) {
-            ImGui::ClearActiveID();
-            t_anim = 1.0f;
-        }
-        t = visible ? (t_anim) : (1.0f - t_anim);
-    }
-    item_size = ImLerp(label_size, item_size, t);
-
-    // Size default to hold ~7 items. Fractional number of items helps seeing that we can scroll down/up without looking at scrollbar.
-    ImVec2 size = ImGui::CalcItemSize(item_size, ImGui::CalcItemWidth(),
-                                      ImGui::GetTextLineHeightWithSpacing() * 7.4f + style.ItemSpacing.y);
-    ImRect frame_bb(window->DC.CursorPos, ImVec2(window->DC.CursorPos.x + size.x, window->DC.CursorPos.y + size.y));
-    ImRect bb(frame_bb.Min, frame_bb.Max);
-    window->DC.LastItemRect = bb; // Forward storage
-    g.NextItemData.ClearFlags();
-
-    if (!ImGui::IsRectVisible(bb.Min, bb.Max)) {
-        ImGui::ItemSize(bb.GetSize(), style.FramePadding.y);
-        ImGui::ItemAdd(bb, 0, &frame_bb);
-        return false;
-    }
-
-    const ImVec2 p = ImGui::GetCursorPos();
-    ImGui::InvisibleButton(label, label_size);
-    if (ImGui::IsItemClicked()) {
-        ImGui::SetActiveID(id, window);
-        visible = !visible;
-    }
-    ImU32 col_bg = ImGui::GetColorU32(ImGuiCol_ChildBg, max(0.5f, t));
-//    ImU32 col_bg = ImGui::GetColorU32(
-//            ImLerp(ImGui::GetStyleColorVec4(ImGuiCol_Header), ImGui::GetStyleColorVec4(ImGuiCol_ChildBg), t));
-    if (ImGui::IsItemHovered() && !visible && t == 0.0f) {
-        col_bg = ImGui::GetColorU32(ImGuiCol_ChildBg);
-    }
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-    ImGui::GetWindowDrawList()->AddRectFilled(bb.Min, bb.Max, col_bg, style.ChildRounding);
-
-    ImGui::SetCursorPos(p);
-    ImGui::BeginChild(id, frame_bb.GetSize(), true, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
-    ImGui::PushFont(title_font);
-    ImGui::Text("%s", label);
-
-    ImGui::PushItemWidth(-1);
-
-    ImGui::PopFont();
-    ImGui::Separator();
-    return true;
-}
-
-void EndCard() {
-    ImGuiWindow *parent_window = ImGui::GetCurrentWindow()->ParentWindow;
-    const ImRect bb = parent_window->DC.LastItemRect;
-    const ImGuiStyle &style = ImGui::GetStyle();
-
-    ImGui::PopItemWidth();
-
-    ImGui::EndChild();
-    ImGui::PopStyleColor(1);
-
-    ImGui::SameLine();
-    parent_window->DC.CursorPos = bb.Min;
-    ImGui::ItemSize(bb, style.FramePadding.y);
 }
 
 // Main code
@@ -683,7 +432,6 @@ int main(int, char **) {
 
         // Show parameters window
         {
-            // TODO Collapsable UI --> more organized
             // Set next window size & pos
             ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
             ImGui::SetNextWindowSize(ImVec2(width_parameter_window, io.DisplaySize.y), ImGuiCond_Always);
@@ -702,7 +450,7 @@ int main(int, char **) {
 
                 if (ImGui::BeginTabItem("Parameters")) {
                     // Camera Card
-                    if (BeginCard("Camera", font_title, 4.5 + calibrated, show_camera_card)) {
+                    if (ccalib::BeginCard("Camera", font_title, 4.5 + calibrated, show_camera_card)) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Device");
                         ImGui::SameLine(spacing);
@@ -728,7 +476,7 @@ int main(int, char **) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Stream");
                         ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-                        ToggleButton("##cam_toggle", &cameraOn, !cameraOn);
+                        ccalib::ToggleButton("##cam_toggle", &cameraOn, !cameraOn);
                         if (cameraOn && ImGui::IsItemClicked(0)) {
                             cam.open();
                             cam.updateParameters(camParams);
@@ -742,20 +490,20 @@ int main(int, char **) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Flip Image");
                         ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-                        ToggleButton("##flip_toggle", &flip_img);
+                        ccalib::ToggleButton("##flip_toggle", &flip_img);
 
                         if (calibrated) {
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Undistort Image");
                             ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
-                            ToggleButton("##undistort_toggle", &undistort);
+                            ccalib::ToggleButton("##undistort_toggle", &undistort);
                         }
 
-                        EndCard();
+                        ccalib::EndCard();
                     }
 
                     // Camera Parameters Card
-                    if (BeginCard("Parameters", font_title, 5.5, show_parameters_card)) {
+                    if (ccalib::BeginCard("Parameters", font_title, 5.5, show_parameters_card)) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Resolution");
                         ImGui::SameLine(spacing);
@@ -770,7 +518,7 @@ int main(int, char **) {
                         const char *button_text = "Set";
                         ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
                                         style.FramePadding.x);
-                        if (MaterialButton(button_text)) {
+                        if (ccalib::MaterialButton(button_text)) {
                             cam.updateResolution(camParams.width, camParams.height);
                             changed = true;
                         }
@@ -823,11 +571,11 @@ int main(int, char **) {
                         }
 
 
-                        EndCard();
+                        ccalib::EndCard();
                     }
 
                     // Calibration Parameters Card
-                    if (BeginCard("Calibration", font_title, 5.5, show_calibration_card)) {
+                    if (ccalib::BeginCard("Calibration", font_title, 5.5, show_calibration_card)) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Rows");
                         ImGui::SameLine(spacing);
@@ -848,7 +596,7 @@ int main(int, char **) {
                         const char *button_text = calibration_mode ? "Reset" : "Start";
                         ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
                                         style.FramePadding.x);
-                        if (MaterialButton(button_text, !calibration_mode && cam.isStreaming())) {
+                        if (ccalib::MaterialButton(button_text, !calibration_mode && cam.isStreaming())) {
                             calibration_mode = !calibration_mode;
                             if (cameraOn && calibration_mode) {
                                 x_min = camera_width;
@@ -877,7 +625,7 @@ int main(int, char **) {
                         if (!cameraOn)
                             calibration_mode = false;
 
-                        EndCard();
+                        ccalib::EndCard();
                     }
                     ImGui::EndTabItem();
                 }
@@ -932,39 +680,39 @@ int main(int, char **) {
                         }
 
                         // Show Coverage Card
-                        if (BeginCard("Coverage", font_title, 9.5,
+                        if (ccalib::BeginCard("Coverage", font_title, 9.5,
                                       show_coverage_card)) {
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Horizontal Coverage");
 
-                            CoveredBar((x_min - (0.1f * camera_width)) / camera_width,
+                            ccalib::CoveredBar((x_min - (0.1f * camera_width)) / camera_width,
                                        (x_max + (0.1f * camera_width)) / camera_width,
                                        (camera_width - mean.x) / camera_width);
 
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Vertical Coverage");
 
-                            CoveredBar((y_min - (0.1f * camera_height)) / camera_height,
+                            ccalib::CoveredBar((y_min - (0.1f * camera_height)) / camera_height,
                                        (y_max + (0.1f * camera_height)) / camera_height,
                                        (camera_height - mean.y) / camera_height);
 
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Size Coverage");
-                            CoveredBar((size_min - 0.1f), (size_max + 0.1f), size);
+                            ccalib::CoveredBar((size_min - 0.1f), (size_max + 0.1f), size);
 
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Skew Coverage");
-                            CoveredBar((skew_min - 0.1f), (skew_max + 0.1f), skew);
+                            ccalib::CoveredBar((skew_min - 0.1f), (skew_max + 0.1f), skew);
 
-                            EndCard();
+                            ccalib::EndCard();
                         }
 
                         // Snapshots Card
-                        if (BeginCard("Snapshots", font_title, 3.3 + snapshots.size() * 0.76, show_snapshots_card)) {
+                        if (ccalib::BeginCard("Snapshots", font_title, 3.3 + snapshots.size() * 0.76, show_snapshots_card)) {
                             // Collect snapshot button
                             // TODO automatic collection of snapshots
                             const char *status_text;
-                            if (MaterialButton("Snapshot", !calibrated && snapshots.size() < 4) && cam.isStreaming())
+                            if (ccalib::MaterialButton("Snapshot", !calibrated && snapshots.size() < 4) && cam.isStreaming())
                                 taking_snapshot = true;
 
                             if (taking_snapshot)
@@ -1027,7 +775,7 @@ int main(int, char **) {
 
                             ImGui::SameLine();
                             ImGui::Text("%s", status_text);
-                            CoveredBar(0.0f, movement_ind);
+                            ccalib::CoveredBar(0.0f, movement_ind);
 
                             // List all snapshots
                             // TODO progress bar of how many snapshots need to be taken
@@ -1092,7 +840,7 @@ int main(int, char **) {
                                 ImGui::PopStyleVar(1);
                                 ImGui::PopItemWidth();
                             }
-                            EndCard();
+                            ccalib::EndCard();
                         }
                         ImGui::EndTabItem();
                     } else {
@@ -1107,9 +855,9 @@ int main(int, char **) {
                 if (snapshots.size() >= 4 && calibration_mode && calibrated) {
                     if (ImGui::BeginTabItem("Results")) {
                         // Results Card
-                        if (BeginCard("Results", font_title, 7.5,
+                        if (ccalib::BeginCard("Results", font_title, 7.5,
                                       show_result_card)) {
-                            if (MaterialButton("Re-Calibrate", false) || snapshots.size() != instance_errs.size()) {
+                            if (ccalib::MaterialButton("Re-Calibrate", false) || snapshots.size() != instance_errs.size()) {
                                 calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size, snapshots, R, T, K,
                                                              D, instance_errs, reprojection_err);
                                 undistort = true;
@@ -1117,7 +865,7 @@ int main(int, char **) {
 
                             if (calibrated) {
                                 ImGui::SameLine();
-                                if (MaterialButton("Export", calibrated)) {
+                                if (ccalib::MaterialButton("Export", calibrated)) {
                                     cv::FileStorage fs("calibration.yaml",
                                                        cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
                                     fs << "image_width" << camera_width;
@@ -1145,7 +893,7 @@ int main(int, char **) {
                                                           ImVec2(0, ImGui::GetTextLineHeight() * 11),
                                                           ImGuiInputTextFlags_ReadOnly);
                             }
-                            EndCard();
+                            ccalib::EndCard();
                         }
                         ImGui::EndTabItem();
                     }
@@ -1225,7 +973,7 @@ int main(int, char **) {
                     p *= scaling;
                     p += offset;
                 }
-                drawPoints(corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), size * 4.0f);
+                ccalib::drawPoints(corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), size * 4.0f);
             }
 
             // Draw Frame around checkerboard
@@ -1241,7 +989,7 @@ int main(int, char **) {
                     p += offset;
                 }
                 if (curr_target >= target_frames.size())
-                    drawRectangle(frame_corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
+                    ccalib::drawRectangle(frame_corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
             }
 
             // Draw target frames
@@ -1272,16 +1020,16 @@ int main(int, char **) {
                             taking_snapshot = true;
                         }
                         in_target = true;
-                        drawRectangle(target_corners, ImVec4(0.13f, 0.83f, 0.91f, 1.00f), 24.0f, true);
+                        ccalib::drawRectangle(target_corners, ImVec4(0.13f, 0.83f, 0.91f, 1.00f), 24.0f, true);
                     } else {
                         taking_snapshot = false;
                         in_target = false;
-                        drawRectangle(target_corners, col_bg, 12.0f, true);
+                        ccalib::drawRectangle(target_corners, col_bg, 12.0f, true);
                     }
 
                     double area_diff = abs(1.0f - (float) frameArea / (float) targetArea);
                     col_bg = interp_color((float) area_diff, 0, 1.0f);
-                    drawRectangle(frame_corners, col_bg, 4.0f, true);
+                    ccalib::drawRectangle(frame_corners, col_bg, 4.0f, true);
                 }
             }
 

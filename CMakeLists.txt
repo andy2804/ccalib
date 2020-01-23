@@ -37,6 +37,10 @@ set(sources
         src/camera.cpp
         src/camera.h
         src/structures.h
+        src/functions.cpp
+        src/functions.h
+        src/imgui_extensions.cpp
+        src/imgui_extensions.h
     )
 
 add_executable(ccalib src/main.cpp ${sources})

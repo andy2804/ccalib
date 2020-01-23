@@ -2,8 +2,8 @@
 // Created by andya on 02.07.18.
 //
 
-#ifndef V4L2_CAMERA_H
-#define V4L2_CAMERA_H
+#ifndef CAMERA_H
+#define CAMERA_H
 
 #include <string>
 #include <linux/videodev2.h>
@@ -71,4 +71,4 @@ namespace ccalib {
 
 } // namespace ccalib
 
-#endif
+#endif // CAMERA_H

@@ -56,12 +56,9 @@ namespace ccalib {
 
     void Camera::open() {
         // Open camera connection
-        cout << "Opening: " << device << endl;
         camera.open(device);
         if (!isOpened())
             printf("Camera %s could not be opened!", device.c_str());
-        else
-            cout << "Connection established!" << endl;
 
         // Update parameters
         updateParameters();
@@ -140,24 +137,19 @@ namespace ccalib {
     }
 
     void Camera::close() {
-        cout << "Closing camera... ";
         while (streamOn) {
             streamFlag = false;
         }
         while (isOpened())
             camera.release();
-        cout << "closed." << endl;
     }
 
     void Camera::grab() {
-        cout << "Streaming..." << endl;
         while (streamFlag) {
-            cout << "." << endl;
             if (camera.grab())
                 camera.retrieve(image);
         }
         streamOn = false;
-        cout << "Stopped streaming." << endl;
     }
 
     void Camera::captureFrame(cv::Mat &destination) {
@@ -170,14 +162,12 @@ namespace ccalib {
 
     void Camera::startStream() {
         // Activate streaming
-        cout << "Start streaming... ";
         if (isOpened()) {
             streamOn = true;
             streamFlag = true;
             std::thread t(&Camera::grab, this);
             t.detach();
         }
-        cout << "started." << endl;
     }
 
     void Camera::stopStream() {
