@@ -286,7 +286,7 @@ int main(int, char **) {
     cv::Mat D = cv::Mat::zeros(8, 1, CV_64F);
     vector<cv::Mat> R, T;
     auto reprojection_err = DBL_MAX;
-    int curr_snapshot = -1;
+    int snapID = -1;
     vector<ccalib::Snapshot> snapshots;
     vector<float> instance_errs;
     vector<cv::Point2f> corners;
@@ -552,7 +552,7 @@ int main(int, char **) {
                                 frame = newFrame;
                                 reprojection_err = DBL_MAX;
                                 undistort = false;
-                                curr_snapshot = -1;
+                                snapID = -1;
 
                                 snapshots.clear();
                                 instance_errs.clear();
@@ -599,9 +599,9 @@ int main(int, char **) {
                                 absToRelativePoints(fc.points, cv::Size(camParams.width, camParams.height));
                                 double width = max(cv::norm(fc.topRight() - fc.topLeft()), cv::norm(fc.bottomRight() - fc.bottomLeft()));
                                 double height = max(cv::norm(fc.bottomLeft() - fc.topLeft()), cv::norm(fc.bottomRight() - fc.topRight()));
-                                frame.pos = fc.topLeft() + (fc.bottomLeft() - fc.topLeft()) / 2;
+                                frame.pos = fc.topLeft() + (fc.bottomRight() - fc.topLeft()) / 2;
                                 frame.size = (float) sqrt(width * height);
-                                frame.skew = (float) log(width / height / skewRatio / camParams.ratio) / 3.0f + 0.5f;
+                                frame.skew = (float) log(width / height / skewRatio * camParams.ratio) / 3.0f + 0.5f;
                                 frameCorners = fc;
                             }
                         }
@@ -671,6 +671,10 @@ int main(int, char **) {
                                     gettimeofday(&instance.id, nullptr);
                                     img.copyTo(instance.img);
                                     instance.corners.assign(corners.begin(), corners.end());
+                                    instance.x = frame.pos.x;
+                                    instance.y = frame.pos.y;
+                                    instance.size = frame.size;
+                                    instance.skew = frame.skew;
                                     snapshots.push_back(instance);
 
                                     // Update coverage
@@ -706,7 +710,7 @@ int main(int, char **) {
                                 ImDrawList *drawList = ImGui::GetWindowDrawList();
                                 for (int i = 0; i < snapshots.size(); i++) {
                                     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4);
-                                    bool is_selected = i == curr_snapshot;
+                                    bool is_selected = i == snapID;
                                     string text;
                                     double stamp = snapshots[i].id.tv_sec + (snapshots[i].id.tv_usec / 1e6);
                                     text = to_string(i) + ": " + to_string(stamp);
@@ -714,7 +718,7 @@ int main(int, char **) {
                                     ImVec2 s(ImGui::GetContentRegionAvailWidth(),
                                              ImGui::GetTextLineHeight() + 4);
 
-                                    if (instance_errs.size() > i && i != curr_snapshot) {
+                                    if (instance_errs.size() > i && i != snapID) {
                                         ImVec4 color = interp_color(instance_errs[i], 0.0f, 1.0f);
 //                                        color.x *= 0.56f;
 //                                        color.y *= 0.83f;
@@ -726,9 +730,9 @@ int main(int, char **) {
 
                                     if (ImGui::Selectable(text.c_str(), is_selected)) {
                                         if (is_selected)
-                                            curr_snapshot = -1;
+                                            snapID = -1;
                                         else
-                                            curr_snapshot = i;
+                                            snapID = i;
                                     }
 
                                     if (is_selected) {
@@ -743,12 +747,12 @@ int main(int, char **) {
                                                           3.0f, ImDrawCornerFlags_All, 3.0f);
                                         if (ImGui::BeginPopupContextItem()) {
                                             if (ImGui::Selectable("Remove")) {
-                                                snapshots.erase(snapshots.begin() + curr_snapshot);
+                                                snapshots.erase(snapshots.begin() + snapID);
 
                                                 // Update coverage
                                                 updateCoverage(snapshots, coverage);
 
-                                                curr_snapshot--;
+                                                snapID--;
                                                 if (snapshots.size() >= 4) {
                                                     calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size,
                                                                                  snapshots, R, T, K,
@@ -825,9 +829,10 @@ int main(int, char **) {
                 }
                 ImGui::EndTabBar();
 
-                if (curr_snapshot != -1) {
-                    img = snapshots[curr_snapshot].img;
-                    corners = snapshots[curr_snapshot].corners;
+                if (snapID != -1) {
+                    img = snapshots[snapID].img;
+                    corners = snapshots[snapID].corners;
+                    frame.size = snapshots[snapID].size;
                 } else if (cam.isOpened() && !cam.isStreaming()) {
                     cam.captureFrame(img);
                     cv::cvtColor(img, img, CV_BGR2RGB);
@@ -854,7 +859,7 @@ int main(int, char **) {
                          ImGuiWindowFlags_NoTitleBar);
 
             if (cameraOn) {
-                if (curr_snapshot == -1) {
+                if (snapID == -1) {
                     if (flip_img)
                         cv::flip(img, img, 1);
                     if (undistort) {
@@ -891,7 +896,7 @@ int main(int, char **) {
 
             // Draw Corners
             if (calibration_mode && !corners.empty()) {
-                if (flip_img && curr_snapshot == -1) {
+                if (flip_img && snapID == -1) {
                     flipPoints(corners, img_size_old);
                 }
                 for (auto &p : corners) {
@@ -933,7 +938,7 @@ int main(int, char **) {
                     target_corners[i].y = target_corners[i].y * img.rows + offset.y;
                 }
 
-                if (!corners.empty() && !frameCorners.points.empty() && curr_snapshot == -1) {
+                if (!corners.empty() && !frameCorners.points.empty() && snapID == -1) {
                     double dist = cv::norm((target_corners[0] + (target_corners[2] - target_corners[0]) / 2) -
                                            (frameCorners.topLeft() + (frameCorners.bottomRight() - frameCorners.topLeft()) / 2));
                     double frameArea = cv::contourArea(frameCorners.points);
@@ -961,10 +966,10 @@ int main(int, char **) {
 
             if (reprojection_err != DBL_MAX) {
                 string reproj_error;
-                if (curr_snapshot == -1)
+                if (snapID == -1)
                     reproj_error = "Mean Reprojection Error: " + to_string(reprojection_err);
                 else
-                    reproj_error = "Reprojection Error: " + to_string(instance_errs[curr_snapshot]);
+                    reproj_error = "Reprojection Error: " + to_string(instance_errs[snapID]);
                 float text_width = ImGui::CalcTextSize(reproj_error.c_str()).x;
                 ImGui::SetCursorPos(ImVec2(pos.x + img.cols - text_width - 16, pos.y + 17));
                 ImGui::TextColored(ImColor(0, 0, 0, 255), "%s", reproj_error.c_str());
