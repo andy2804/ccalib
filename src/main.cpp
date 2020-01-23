@@ -116,11 +116,6 @@ bool calibrateCamera(const int &chkbrd_rows, const int &chkbrd_cols, const float
     return reprojection_err <= 0.3;
 }
 
-ImVec4 interp_color(const float &x, const float &lb, const float &ub) {
-    float x_interp = (x - ub) / (lb - ub);
-    return ImVec4(1.0f - x_interp, x_interp, 0.0f, 1.0f);
-}
-
 void flipPoints(vector<cv::Point2f> &points, const cv::Size &img_size, const int &direction = 0) {
     for (auto &p : points) {
         if (direction)
@@ -719,7 +714,7 @@ int main(int, char **) {
                                              ImGui::GetTextLineHeight() + 4);
 
                                     if (instance_errs.size() > i && i != snapID) {
-                                        ImVec4 color = interp_color(instance_errs[i], 0.0f, 1.0f);
+                                        ImVec4 color = ccalib::interp_color(instance_errs[i], 0.0f, 1.0f);
 //                                        color.x *= 0.56f;
 //                                        color.y *= 0.83f;
                                         color.w *= 0.5f;
@@ -738,7 +733,7 @@ int main(int, char **) {
                                     if (is_selected) {
                                         ImVec4 color;
                                         if (instance_errs.size() > i)
-                                            color = interp_color(instance_errs[i], 0.0f, 1.0f);
+                                            color = ccalib::interp_color(instance_errs[i], 0.0f, 1.0f);
                                         else
                                             color = ImVec4(0.56f, 0.83f, 0.26f, 1.0f);
                                         drawList->AddRect(ImVec2(p.x - 5, p.y - 4),
@@ -944,7 +939,7 @@ int main(int, char **) {
                     double frameArea = cv::contourArea(frameCorners.points);
                     double targetArea = cv::contourArea(target_corners);
 
-                    ImVec4 col_bg = interp_color((float) dist, 0, img.rows / 2.0f);
+                    ImVec4 col_bg = ccalib::interp_color((float) dist, 0, img.rows / 2.0f);
 
                     if (dist <= frame.size * 64 * scaling && frameArea > targetArea * 0.8f && frameArea < targetArea * 1.2f) {
                         if (!taking_snapshot) {
@@ -959,7 +954,7 @@ int main(int, char **) {
                     }
 
                     double area_diff = abs(1.0f - (float) frameArea / (float) targetArea);
-                    col_bg = interp_color((float) area_diff, 0, 1.0f);
+                    col_bg = ccalib::interp_color((float) area_diff, 0, 1.0f);
                     ccalib::drawRectangle(frameCorners.points, col_bg, 4.0f, true);
                 }
             }

@@ -11,6 +11,8 @@ namespace ccalib {
 
     void StyleColorsMaterial();
 
+    ImVec4 interp_color(const float &x, const float &lb, const float &ub);
+
     void ToggleButton(const char *str_id, bool *v, const bool focus = false);
 
     void CoveredBar(const float &start, const float &stop, const float &indicator = -1);

@@ -85,6 +85,11 @@ namespace ccalib {
         colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
     }
 
+    ImVec4 interp_color(const float &x, const float &lb, const float &ub) {
+        float x_interp = (x - ub) / (lb - ub);
+        return ImVec4(1.0f - x_interp, x_interp, 0.0f, 1.0f);
+    }
+
     void ToggleButton(const char *str_id, bool *v, const bool focus) {
         ImVec2 p = ImGui::GetCursorScreenPos();
         ImDrawList *draw_list = ImGui::GetWindowDrawList();
