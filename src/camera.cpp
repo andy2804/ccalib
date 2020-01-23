@@ -38,7 +38,7 @@ namespace ccalib {
         params.width = 640;
         params.height = 480;
         params.ratio = 640.0f / 480.0f;
-        params.framerate = 30;
+        params.fps = 30;
         params.format = "YUVY";
         params.autoExposure = false;
         params.exposure = 0.333;
@@ -81,19 +81,20 @@ namespace ccalib {
         if (isOpened() && !streamOn) {
             // Set new params
             camera.set(CV_CAP_PROP_FOURCC, fourcc(params.format.c_str()));
-            camera.set(CV_CAP_PROP_FPS, params.framerate);
+            camera.set(CV_CAP_PROP_FPS, params.fps);
             camera.set(CV_CAP_PROP_FRAME_WIDTH, params.width);
             camera.set(CV_CAP_PROP_FRAME_HEIGHT, params.height);
             camera.set(CV_CAP_PROP_AUTO_EXPOSURE, params.autoExposure ? 0.75 : 0.25);
             camera.set(CV_CAP_PROP_EXPOSURE, params.exposure);
 
             // Update with actual settings
-            uint32_t fourcc = camera.get(CV_CAP_PROP_FOURCC);
+            auto fourcc = static_cast<uint32_t>(camera.get(CV_CAP_PROP_FOURCC));
             params.format = cv::format("%c%c%c%c", fourcc & 255, (fourcc >> 8) & 255, (fourcc >> 16) & 255, (fourcc >> 24) & 255);
-            params.framerate = camera.get(CV_CAP_PROP_FPS);
-            params.width = camera.get(CV_CAP_PROP_FRAME_WIDTH);
-            params.height = camera.get(CV_CAP_PROP_FRAME_HEIGHT);
-            params.exposure = camera.get(CV_CAP_PROP_EXPOSURE);
+            params.fps = (int) camera.get(CV_CAP_PROP_FPS);
+            params.width = (int) camera.get(CV_CAP_PROP_FRAME_WIDTH);
+            params.height = (int) camera.get(CV_CAP_PROP_FRAME_HEIGHT);
+            params.exposure = (float) camera.get(CV_CAP_PROP_EXPOSURE);
+            params.ratio = (float) params.width / params.height;
         } else if (isOpened()) {
             stopStream();
             updateParameters();
@@ -110,13 +111,13 @@ namespace ccalib {
         updateParameters();
     }
 
-    void Camera::updateFramerate(const double &fps) {
-        params.framerate = fps;
+    void Camera::updateFramerate(const int &fps) {
+        params.fps = fps;
         updateParameters();
     }
 
     void Camera::updateExposure(const float &exposure) {
-        params.exposure = (double) exposure;
+        params.exposure = exposure;
         camera.set(CV_CAP_PROP_EXPOSURE, params.exposure);
     }
 
@@ -125,10 +126,10 @@ namespace ccalib {
         updateParameters();
     }
 
-    void Camera::updateResolution(const double &width, const double &height) {
-        params.width = (double) width;
-        params.height = (double) height;
-        params.ratio = (double) width / (double) height;
+    void Camera::updateResolution(const int &width, const int &height) {
+        params.width = width;
+        params.height = height;
+        params.ratio = (float) width / height;
         updateParameters();
     }
 
@@ -178,7 +179,7 @@ namespace ccalib {
     }
 
     constexpr uint32_t Camera::fourcc(char const p[5]) {
-        return (((p[0]) & 255) + (((p[1]) & 255) << 8) + (((p[2]) & 255) << 16) + (((p[3]) & 255) << 24));
+        return static_cast<uint32_t>(((p[0]) & 255) + (((p[1]) & 255) << 8) + (((p[2]) & 255) << 16) + (((p[3]) & 255) << 24));
     }
 
 } // namespace ccalib

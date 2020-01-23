@@ -18,11 +18,11 @@ namespace ccalib {
 
     struct CameraParameters {
         bool autoExposure;
+        int width;
+        int height;
+        int fps;
         float exposure;
-        double width;
-        double height;
-        double ratio;
-        double framerate;
+        float ratio;
         std::string format;
     };
 

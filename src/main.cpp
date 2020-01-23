@@ -12,7 +12,7 @@
 #include "imgui_extensions.h"
 
 #include <ctime>
-#include <stdio.h>
+#include <cstdio>
 #include <vector>
 #include <iostream>
 #include <SDL.h>
@@ -23,12 +23,6 @@
 
 using namespace std;
 namespace fs = std::experimental::filesystem;
-
-struct snapshot {
-    timeval id;
-    cv::Mat img;
-    vector<cv::Point2f> corners;
-};
 
 void mat2Texture(cv::Mat &image, GLuint &imageTexture) {
     if (image.empty()) {
@@ -87,7 +81,7 @@ double computeReprojectionErrors(const vector<vector<cv::Point3f> > &objectPoint
                       distCoeffs, imagePoints2);
         err = norm(cv::Mat(imagePoints[i]), cv::Mat(imagePoints2), CV_L2);              // difference
 
-        int n = (int) objectPoints[i].size();
+        auto n = (int) objectPoints[i].size();
         perViewErrors[i] = (float) std::sqrt(err * err / n);                        // save for this view
         totalErr += err * err;                                             // sum it up
         totalPoints += n;
@@ -97,14 +91,13 @@ double computeReprojectionErrors(const vector<vector<cv::Point3f> > &objectPoint
 }
 
 bool calibrateCamera(const int &chkbrd_rows, const int &chkbrd_cols, const float &chkbrd_size,
-                     vector<snapshot> instances, vector<cv::Mat> &R, vector<cv::Mat> &T,
+                     vector<ccalib::Snapshot> instances, vector<cv::Mat> &R, vector<cv::Mat> &T,
                      cv::Mat &K, cv::Mat &D, vector<float> &instance_errs, double &reprojection_err) {
     // Initialize values
     vector<cv::Point3f> corners3d;
     for (int i = 0; i < chkbrd_rows - 1; ++i)
         for (int j = 0; j < chkbrd_cols - 1; ++j)
-            corners3d.push_back(
-                    cv::Point3f(float(j * chkbrd_size), float(i * chkbrd_size), 0));
+            corners3d.emplace_back(j * chkbrd_size, i * chkbrd_size, 0);
 
     vector<vector<cv::Point2f>> imgPoints;
     vector<vector<cv::Point3f>> objPoints;
@@ -117,12 +110,10 @@ bool calibrateCamera(const int &chkbrd_rows, const int &chkbrd_cols, const float
     const int camera_height = instances[0].img.rows;
 
     cv::calibrateCamera(objPoints, imgPoints, cv::Size(camera_width, camera_height),
-                        K, D, R, T, CV_CALIB_FIX_ASPECT_RATIO |
-                                    CV_CALIB_FIX_K4 |
-                                    CV_CALIB_FIX_K5);
+                        K, D, R, T, CV_CALIB_FIX_ASPECT_RATIO | CV_CALIB_FIX_K4 | CV_CALIB_FIX_K5);
 
     reprojection_err = computeReprojectionErrors(objPoints, imgPoints, R, T, K, D, instance_errs);
-    return reprojection_err <= 0.3 ? true : false;
+    return reprojection_err <= 0.3;
 }
 
 ImVec4 interp_color(const float &x, const float &lb, const float &ub) {
@@ -171,8 +162,7 @@ int main(int, char **) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_WindowFlags window_flags = (SDL_WindowFlags) (
-            SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    auto window_flags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window *window = SDL_CreateWindow("ccalib", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
                                           window_flags);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
@@ -193,7 +183,6 @@ int main(int, char **) {
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
-    ImGuiContext *ctx = ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     (void) io;
 
@@ -297,21 +286,16 @@ int main(int, char **) {
     bool in_target = false;
 
     // camera specific state variables
-    int camera_curr = 0;
-    int camera_width = 640;
-    int camera_height = 480;
-    float camera_exposure = 0.333;   // in [ms]
-    bool camera_autoexp = false;
-    int camera_actfps = 30;
-    int camera_currfps = 4;
-    int camera_currfmt = 0;
+    int camID = 0;
+    int camFPS = 4;
+    int camFMT = 0;
 
     ccalib::CameraParameters camParams;
     camParams.width = 640;
     camParams.height = 480;
-    camParams.ratio = (double) camParams.width / (double) camParams.height;
+    camParams.ratio = 640.0f / 480.0f;
     camParams.exposure = 0.333;
-    camParams.framerate = 30;
+    camParams.fps = 30;
     camParams.autoExposure = false;
     camParams.format = "YUVY";
 
@@ -321,16 +305,16 @@ int main(int, char **) {
     float chkbrd_size = 0.022;      // in [m]
 
     // Coverage specific state variables
-    float x_min = camera_width;
+    float x_min = camParams.width;
     float x_max = 0;
-    float y_min = camera_height;
+    float y_min = camParams.height;
     float y_max = 0;
     float size_min = 1.0f;
     float size_max = 0.0f;
-    float max_size = camera_width * camera_height;
+    float max_size = static_cast<float>(camParams.width * camParams.height);
     float skew_min = 1.0f;
     float skew_max = 0.0f;
-    cv::Point2f mean(camera_width / 2.0f, camera_height / 2.0f);
+    cv::Point2f mean(camParams.width / 2.0f, camParams.height / 2.0f);
     float size = 0.5f;
     float mid_skew = ((chkbrd_cols - 1.0f) / (chkbrd_rows - 1.0f));
 //    mid_skew = mid_skew > 1 ? mid_skew - 1 : (1 / mid_skew) - 1;
@@ -340,9 +324,9 @@ int main(int, char **) {
     cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
     cv::Mat D = cv::Mat::zeros(8, 1, CV_64F);
     vector<cv::Mat> R, T;
-    double reprojection_err = DBL_MAX;
+    auto reprojection_err = DBL_MAX;
     int curr_snapshot = -1;
-    vector<snapshot> snapshots;
+    vector<ccalib::Snapshot> snapshots;
     vector<float> instance_errs;
     vector<cv::Point2f> corners;
     vector<cv::Point2f> frame_corners;
@@ -391,8 +375,8 @@ int main(int, char **) {
     // TODO Use v4l2 VIDIOC_ENUM_FMT to read out all valid formats
     vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
     vector<string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
-    cv::Mat img = cv::Mat::zeros(cv::Size(camera_width, camera_height), CV_8UC3);
-    cv::Mat img_prev = cv::Mat::zeros(cv::Size(camera_width, camera_height), CV_8UC3);
+    cv::Mat img = cv::Mat::zeros(cv::Size(camParams.width, camParams.height), CV_8UC3);
+    cv::Mat img_prev = cv::Mat::zeros(cv::Size(camParams.width, camParams.height), CV_8UC3);
     GLuint texture;
 
     // ==========================================
@@ -409,7 +393,7 @@ int main(int, char **) {
     }
 
     // Try to open connection to first camera in device list
-    ccalib::Camera cam(cameras[camera_curr], camParams);
+    ccalib::Camera cam(cameras[camID], camParams);
 
 
     // Main loop
@@ -450,21 +434,21 @@ int main(int, char **) {
 
                 if (ImGui::BeginTabItem("Parameters")) {
                     // Camera Card
-                    if (ccalib::BeginCard("Camera", font_title, 4.5 + calibrated, show_camera_card)) {
+                    if (ccalib::BeginCard("Camera", font_title, 4.5f + calibrated, show_camera_card)) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Device");
                         ImGui::SameLine(spacing);
 
-                        if (ImGui::BeginCombo("##camera_selector", cameras[camera_curr].c_str(), 0)) {
+                        if (ImGui::BeginCombo("##camera_selector", cameras[camID].c_str(), 0)) {
                             for (int i = 0; i < cameras.size(); i++) {
-                                bool is_selected = (cameras[camera_curr] == cameras[i]);
+                                bool is_selected = (cameras[camID] == cameras[i]);
                                 if (ImGui::Selectable(cameras[i].c_str(), is_selected)) {
                                     if (cameraOn) {
                                         cam.stopStream();
                                         cam.close();
                                         cameraOn = false;
                                     }
-                                    camera_curr = i;
+                                    camID = i;
                                 }
                                 if (is_selected) {
                                     ImGui::SetItemDefaultFocus();
@@ -475,7 +459,7 @@ int main(int, char **) {
 
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Stream");
-                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
+                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
                         ccalib::ToggleButton("##cam_toggle", &cameraOn, !cameraOn);
                         if (cameraOn && ImGui::IsItemClicked(0)) {
                             cam.open();
@@ -489,13 +473,13 @@ int main(int, char **) {
 
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Flip Image");
-                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
+                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
                         ccalib::ToggleButton("##flip_toggle", &flip_img);
 
                         if (calibrated) {
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Undistort Image");
-                            ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8);
+                            ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
                             ccalib::ToggleButton("##undistort_toggle", &undistort);
                         }
 
@@ -508,12 +492,12 @@ int main(int, char **) {
                         ImGui::Text("Resolution");
                         ImGui::SameLine(spacing);
                         ImGui::PushItemWidth(44);
-                        ImGui::InputDouble("##width", &camParams.width, 0, 0, "%.0f");
+                        ImGui::InputInt("##width", &camParams.width, 0);
                         ImGui::SameLine();
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("x");
                         ImGui::SameLine();
-                        ImGui::InputDouble("##height", &camParams.height, 0, 0, "%.0f");
+                        ImGui::InputInt("##height", &camParams.height, 0);
                         ImGui::PopItemWidth();
                         const char *button_text = "Set";
                         ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
@@ -526,14 +510,14 @@ int main(int, char **) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Framerate");
                         ImGui::SameLine(spacing);
-                        if (ImGui::BeginCombo("##camera_fps", to_string(camera_fps[camera_currfps]).c_str(), 0)) {
+                        if (ImGui::BeginCombo("##camera_fps", to_string(camera_fps[camFPS]).c_str(), 0)) {
                             for (int i = 0; i < camera_fps.size(); i++) {
-                                bool is_selected = (camera_fps[camera_currfps] == camera_fps[i]);
+                                bool is_selected = (camera_fps[camFPS] == camera_fps[i]);
                                 if (ImGui::Selectable(to_string(camera_fps[i]).c_str(), is_selected)) {
-                                    camera_currfps = i;
+                                    camFPS = i;
                                     if (!ImGui::IsMouseClicked(0)) {
-                                        camParams.framerate = (double) camera_fps[camera_currfps];
-                                        cam.updateFramerate(camParams.framerate);
+                                        camParams.fps = (int) camera_fps[camFPS];
+                                        cam.updateFramerate(camParams.fps);
                                     }
                                 }
                                 if (is_selected)
@@ -553,13 +537,13 @@ int main(int, char **) {
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("Select Format");
                         ImGui::SameLine(spacing);
-                        if (ImGui::BeginCombo("##camera_fmt", camera_fmt[camera_currfmt].c_str(), 0)) {
+                        if (ImGui::BeginCombo("##camera_fmt", camera_fmt[camFMT].c_str(), 0)) {
                             for (int i = 0; i < camera_fmt.size(); i++) {
-                                bool is_selected = (camera_fmt[camera_currfmt] == camera_fmt[i]);
+                                bool is_selected = (camera_fmt[camFMT] == camera_fmt[i]);
                                 if (ImGui::Selectable(camera_fmt[i].c_str(), is_selected)) {
-                                    camera_currfmt = i;
+                                    camFMT = i;
                                     if (!ImGui::IsMouseClicked(0)) {
-                                        camParams.format = camera_fmt[camera_currfmt];
+                                        camParams.format = camera_fmt[camFMT];
                                         cam.updateFormat(camParams.format );
                                     }
                                 }
@@ -599,14 +583,14 @@ int main(int, char **) {
                         if (ccalib::MaterialButton(button_text, !calibration_mode && cam.isStreaming())) {
                             calibration_mode = !calibration_mode;
                             if (cameraOn && calibration_mode) {
-                                x_min = camera_width;
+                                x_min = camParams.width;
                                 x_max = 0;
-                                y_min = camera_height;
+                                y_min = camParams.height;
                                 y_max = 0;
-                                mean = cv::Point2f(camera_width / 2.0f, camera_height / 2.0f);
+                                mean = cv::Point2f(camParams.width / 2.0f, camParams.height / 2.0f);
                                 size_min = 1.0f;
                                 size_max = 0.0f;
-                                max_size = camera_width * camera_height;
+                                max_size = camParams.width * camParams.height;
                                 skew_min = 1.0f;
                                 skew_max = 0.0f;
                                 mid_skew = ((chkbrd_cols - 1.0f) / (chkbrd_rows - 1.0f));
@@ -634,7 +618,7 @@ int main(int, char **) {
                     // Update params
                     camParams = cam.getParameters();
                     for (int i = 0; i < camera_fps.size(); i++)
-                        camera_currfps = (camera_fps[i] == camera_actfps) ? i : camera_currfps;
+                        camFPS = (camera_fps[i] == camParams.fps) ? i : camFPS;
                     changed = false;
                 }
 
@@ -685,16 +669,16 @@ int main(int, char **) {
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Horizontal Coverage");
 
-                            ccalib::CoveredBar((x_min - (0.1f * camera_width)) / camera_width,
-                                       (x_max + (0.1f * camera_width)) / camera_width,
-                                       (camera_width - mean.x) / camera_width);
+                            ccalib::CoveredBar((x_min - (0.1f * camParams.width)) / camParams.width,
+                                       (x_max + (0.1f * camParams.width)) / camParams.width,
+                                       (camParams.width - mean.x) / camParams.width);
 
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Vertical Coverage");
 
-                            ccalib::CoveredBar((y_min - (0.1f * camera_height)) / camera_height,
-                                       (y_max + (0.1f * camera_height)) / camera_height,
-                                       (camera_height - mean.y) / camera_height);
+                            ccalib::CoveredBar((y_min - (0.1f * camParams.height)) / camParams.height,
+                                       (y_max + (0.1f * camParams.height)) / camParams.height,
+                                       (camParams.height - mean.y) / camParams.height);
 
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Size Coverage");
@@ -708,7 +692,7 @@ int main(int, char **) {
                         }
 
                         // Snapshots Card
-                        if (ccalib::BeginCard("Snapshots", font_title, 3.3 + snapshots.size() * 0.76, show_snapshots_card)) {
+                        if (ccalib::BeginCard("Snapshots", font_title, 3.3f + snapshots.size() * 0.76f, show_snapshots_card)) {
                             // Collect snapshot button
                             // TODO automatic collection of snapshots
                             const char *status_text;
@@ -728,8 +712,8 @@ int main(int, char **) {
                                 cv::Rect rect = cv::minAreaRect(corners).boundingRect();
                                 cv::Mat old_img;
                                 cv::Mat new_img;
-                                if (rect.x > 0 && rect.y > 0 && rect.x + rect.width < camera_width &&
-                                    rect.y + rect.height < camera_height) {
+                                if (rect.x > 0 && rect.y > 0 && rect.x + rect.width < camParams.width &&
+                                    rect.y + rect.height < camParams.height) {
                                     old_img = img_prev(rect);
                                     new_img = img(rect);
                                 } else {
@@ -745,16 +729,16 @@ int main(int, char **) {
 
                                 // If successful, add instance
                                 if (taking_snapshot && mean_diff.val[0] < 4) {
-                                    snapshot instance;
-                                    gettimeofday(&instance.id, NULL);
+                                    ccalib::Snapshot instance;
+                                    gettimeofday(&instance.id, nullptr);
                                     img.copyTo(instance.img);
                                     instance.corners.assign(corners.begin(), corners.end());
                                     snapshots.push_back(instance);
 
-                                    x_min = min(x_min, camera_width - mean.x);
-                                    x_max = max(x_max, camera_width - mean.x);
-                                    y_min = min(y_min, camera_height - mean.y);
-                                    y_max = max(y_max, camera_height - mean.y);
+                                    x_min = min(x_min, camParams.width - mean.x);
+                                    x_max = max(x_max, camParams.width - mean.x);
+                                    y_min = min(y_min, camParams.height - mean.y);
+                                    y_max = max(y_max, camParams.height - mean.y);
                                     size_min = min(size_min, size);
                                     size_max = max(size_max, size);
                                     skew_min = min(skew_min, skew);
@@ -779,7 +763,7 @@ int main(int, char **) {
 
                             // List all snapshots
                             // TODO progress bar of how many snapshots need to be taken
-                            if (snapshots.size() > 0) {
+                            if (!snapshots.empty()) {
                                 ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 16);
                                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 11));
                                 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.2f, 0.2f, 0.2f, 0.2f));
@@ -868,9 +852,9 @@ int main(int, char **) {
                                 if (ccalib::MaterialButton("Export", calibrated)) {
                                     cv::FileStorage fs("calibration.yaml",
                                                        cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
-                                    fs << "image_width" << camera_width;
-                                    fs << "image_height" << camera_height;
-                                    fs << "camera_name" << cameras[camera_curr];
+                                    fs << "image_width" << camParams.width;
+                                    fs << "image_height" << camParams.height;
+                                    fs << "camera_name" << cameras[camID];
                                     fs << "camera_matrix" << K;
                                     fs << "distortion_model" << "plumb_bob";
                                     fs << "distortion_coefficients" << D;
@@ -961,7 +945,7 @@ int main(int, char **) {
             ImVec2 pos = ImVec2((width_avail - img.cols) / 2 + ImGui::GetCursorPosX(),
                                 (height_avail - img.rows) / 2 + ImGui::GetCursorPosY());
             ImGui::SetCursorPos(pos);
-            ImGui::Image((void *) (intptr_t) texture, ImVec2(img.cols, img.rows));
+            ImGui::Image((void *) texture, ImVec2(img.cols, img.rows));
             cv::Point2f offset(pos.x + width_parameter_window, pos.y);
 
             // Draw Corners
@@ -1001,7 +985,7 @@ int main(int, char **) {
                 }
 
                 float chkbrd_ratio = (float) chkbrd_cols / (float) chkbrd_rows;
-                float ratio_offset = (img.rows * (float) camParams.ratio - img.rows * chkbrd_ratio) / 2.0f;
+                float ratio_offset = (img.rows * camParams.ratio - img.rows * chkbrd_ratio) / 2.0f;
                 for (int i = 0; i < frame_corners.size(); i++) {
                     target_corners[i].x = target_corners[i].x * img.rows * chkbrd_ratio + ratio_offset + offset.x;
                     target_corners[i].y = target_corners[i].y * img.rows + offset.y;

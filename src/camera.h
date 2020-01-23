@@ -48,11 +48,11 @@ namespace ccalib {
 
         void captureFrame(cv::Mat &destination);
 
-        void updateResolution(const double &width, const double &height);
+        void updateResolution(const int &width, const int &height);
 
         void updateExposure(const float &exposure);
 
-        void updateFramerate(const double &fps);
+        void updateFramerate(const int &fps);
 
         void updateFormat(const std::string &format);
 
