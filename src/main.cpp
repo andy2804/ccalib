@@ -143,6 +143,45 @@ void increaseRectSize(vector<cv::Point2f> &corners, const float &padding) {
     }
 }
 
+void relativeToAbsPoint(cv::Point2f &point, const cv::Size &img_size) {
+    point.x *= img_size.width;
+    point.y *= img_size.height;
+}
+
+void absToRelativePoint(cv::Point2f &point, const cv::Size &img_size) {
+    point.x /= img_size.width;
+    point.y /= img_size.height;
+}
+
+void relativeToAbsPoints(vector<cv::Point2f> &points, const cv::Size &img_size) {
+    for (auto &p : points)
+        relativeToAbsPoint(p, img_size);
+}
+
+void absToRelativePoints(vector<cv::Point2f> &points, const cv::Size &img_size) {
+    for (auto &p : points)
+        absToRelativePoint(p, img_size);
+}
+
+void updateCoverage(const vector<ccalib::Snapshot> &snapshots, ccalib::CoverageParameters &coverage) {
+    // Get default values for coverage and safe current position
+    ccalib::CoverageParameters newCoverage;
+
+    // Loop through all snapshots
+    for (const auto &s : snapshots) {
+        newCoverage.x_min = min(newCoverage.x_min, 1.0f - s.x);
+        newCoverage.x_max = max(newCoverage.x_max, 1.0f - s.x);
+        newCoverage.y_min = min(newCoverage.y_min, 1.0f - s.y);
+        newCoverage.y_max = max(newCoverage.y_max, 1.0f - s.y);
+        newCoverage.size_min = min(newCoverage.size_min, s.size);
+        newCoverage.size_max = max(newCoverage.size_max, s.size);
+        newCoverage.skew_min = min(newCoverage.skew_min, s.skew);
+        newCoverage.skew_max = max(newCoverage.skew_max, s.skew);
+    }
+
+    coverage = newCoverage;
+}
+
 // Main code
 int main(int, char **) {
     // Setup SDL
@@ -183,7 +222,9 @@ int main(int, char **) {
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
+    ImGuiContext *ctx = ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
+    ImGuiStyle style = ImGui::GetStyle();
     (void) io;
 
     // Setup Dear ImGui style
@@ -230,27 +271,17 @@ int main(int, char **) {
     camParams.format = "YUVY";
 
     // Calibration specific state variables
+    ccalib::Frame frame;
     int chkbrd_rows = 8;
     int chkbrd_cols = 11;
     float chkbrd_size = 0.022;      // in [m]
+    float skewRatio = ((chkbrd_cols - 1.0f) / (chkbrd_rows - 1.0f));
 
     // Coverage specific state variables
-    float x_min = camParams.width;
-    float x_max = 0;
-    float y_min = camParams.height;
-    float y_max = 0;
-    float size_min = 1.0f;
-    float size_max = 0.0f;
-    float max_size = static_cast<float>(camParams.width * camParams.height);
-    float skew_min = 1.0f;
-    float skew_max = 0.0f;
-    cv::Point2f mean(camParams.width / 2.0f, camParams.height / 2.0f);
-    float size = 0.5f;
-    float mid_skew = ((chkbrd_cols - 1.0f) / (chkbrd_rows - 1.0f));
-//    mid_skew = mid_skew > 1 ? mid_skew - 1 : (1 / mid_skew) - 1;
-    float skew = 0.5f;
+    ccalib::CoverageParameters coverage;
 
     // Initialize camera matrix && dist coeff
+    ccalib::CalibrationParameters calibParams;
     cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
     cv::Mat D = cv::Mat::zeros(8, 1, CV_64F);
     vector<cv::Mat> R, T;
@@ -259,7 +290,8 @@ int main(int, char **) {
     vector<ccalib::Snapshot> snapshots;
     vector<float> instance_errs;
     vector<cv::Point2f> corners;
-    vector<cv::Point2f> frame_corners;
+//    vector<cv::Point2f> frame_corners;
+    ccalib::Corners frameCorners;
 
     // Initialize Target Frames for automatic collection
     int curr_target = 0;
@@ -331,6 +363,7 @@ int main(int, char **) {
     while (!done) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+//        while (SDL_WaitEventTimeout(&event, 10)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
             if (event.type == SDL_QUIT)
                 done = true;
@@ -513,20 +546,10 @@ int main(int, char **) {
                         if (ccalib::MaterialButton(button_text, !calibration_mode && cam.isStreaming())) {
                             calibration_mode = !calibration_mode;
                             if (cameraOn && calibration_mode) {
-                                x_min = camParams.width;
-                                x_max = 0;
-                                y_min = camParams.height;
-                                y_max = 0;
-                                mean = cv::Point2f(camParams.width / 2.0f, camParams.height / 2.0f);
-                                size_min = 1.0f;
-                                size_max = 0.0f;
-                                max_size = camParams.width * camParams.height;
-                                skew_min = 1.0f;
-                                skew_max = 0.0f;
-                                mid_skew = ((chkbrd_cols - 1.0f) / (chkbrd_rows - 1.0f));
-                                curr_target = 0;
-                                size = 0.5f;
-                                skew = 0.5f;
+                                ccalib::CoverageParameters newCoverage;
+                                ccalib::Frame newFrame;
+                                coverage = newCoverage;
+                                frame = newFrame;
                                 reprojection_err = DBL_MAX;
                                 undistort = false;
                                 curr_snapshot = -1;
@@ -569,54 +592,39 @@ int main(int, char **) {
                             cv::Mat gray(img.rows, img.cols, CV_8UC1);
                             cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
                             cv::cvtColor(gray, img, cv::COLOR_GRAY2RGB);
-                            //                    cv::resize(gray, gray, cv::Size(gray.cols / 2, gray.rows / 2));
-                            if (findCorners(gray, corners, chkbrd_cols, chkbrd_rows)) {
-//                                cv::drawChessboardCorners(img, cv::Size(chkbrd_cols - 1, chkbrd_rows - 1),
-//                                                          cv::Mat(corners),
-//                                                          true);
-                            }
+                            findCorners(gray, corners, chkbrd_cols, chkbrd_rows);
 
                             if (corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
-//                                cv::RotatedRect rect = cv::minAreaRect(corners);
-//                                mean = rect.center;
-//                                size = sqrt(rect.size.area() / max_size);
-                                cv::Point2f ul = corners[0];
-                                cv::Point2f ur = corners[chkbrd_cols - 2];
-                                cv::Point2f br = corners[corners.size() - 1];
-                                cv::Point2f bl = corners[corners.size() - chkbrd_cols + 1];
-                                frame_corners = {ul, ur, br, bl};
-                                double width = max(cv::norm(ur - ul), cv::norm(br - bl));
-                                double height = max(cv::norm(bl - ul), cv::norm(br - ur));
-                                mean = ul + (br - ul) / 2;
-                                size = (float) sqrt(width * height / max_size);
-                                skew = (float) log(width / height / mid_skew) / 3.0f + 0.5f;
+                                ccalib::Corners fc({corners[0], corners[chkbrd_cols - 2], corners[corners.size() - 1], corners[corners.size() - chkbrd_cols + 1]});
+                                absToRelativePoints(fc.points, cv::Size(camParams.width, camParams.height));
+                                double width = max(cv::norm(fc.topRight() - fc.topLeft()), cv::norm(fc.bottomRight() - fc.bottomLeft()));
+                                double height = max(cv::norm(fc.bottomLeft() - fc.topLeft()), cv::norm(fc.bottomRight() - fc.topRight()));
+                                frame.pos = fc.topLeft() + (fc.bottomLeft() - fc.topLeft()) / 2;
+                                frame.size = (float) sqrt(width * height);
+                                frame.skew = (float) log(width / height / skewRatio / camParams.ratio) / 3.0f + 0.5f;
+                                frameCorners = fc;
                             }
                         }
 
                         // Show Coverage Card
-                        if (ccalib::BeginCard("Coverage", font_title, 9.5,
-                                      show_coverage_card)) {
+                        if (ccalib::BeginCard("Coverage", font_title, 9.5, show_coverage_card)) {
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Horizontal Coverage");
 
-                            ccalib::CoveredBar((x_min - (0.1f * camParams.width)) / camParams.width,
-                                       (x_max + (0.1f * camParams.width)) / camParams.width,
-                                       (camParams.width - mean.x) / camParams.width);
+                            ccalib::CoveredBar(coverage.x_min - 0.1f, coverage.x_max + 0.1f, 1.0f - frame.pos.x);
 
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Vertical Coverage");
 
-                            ccalib::CoveredBar((y_min - (0.1f * camParams.height)) / camParams.height,
-                                       (y_max + (0.1f * camParams.height)) / camParams.height,
-                                       (camParams.height - mean.y) / camParams.height);
+                            ccalib::CoveredBar(coverage.y_min - 0.1f, coverage.y_max + 0.1f, 1.0f - frame.pos.y);
 
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Size Coverage");
-                            ccalib::CoveredBar((size_min - 0.1f), (size_max + 0.1f), size);
+                            ccalib::CoveredBar(coverage.size_min - 0.1f, coverage.size_max + 0.1f, frame.size);
 
                             ImGui::AlignTextToFramePadding();
                             ImGui::Text("Skew Coverage");
-                            ccalib::CoveredBar((skew_min - 0.1f), (skew_max + 0.1f), skew);
+                            ccalib::CoveredBar(coverage.skew_min - 0.1f, coverage.skew_max + 0.1f, frame.skew);
 
                             ccalib::EndCard();
                         }
@@ -665,14 +673,8 @@ int main(int, char **) {
                                     instance.corners.assign(corners.begin(), corners.end());
                                     snapshots.push_back(instance);
 
-                                    x_min = min(x_min, camParams.width - mean.x);
-                                    x_max = max(x_max, camParams.width - mean.x);
-                                    y_min = min(y_min, camParams.height - mean.y);
-                                    y_max = max(y_max, camParams.height - mean.y);
-                                    size_min = min(size_min, size);
-                                    size_max = max(size_max, size);
-                                    skew_min = min(skew_min, skew);
-                                    skew_max = max(skew_max, skew);
+                                    // Update coverage
+                                    updateCoverage(snapshots, coverage);
 
                                     if (snapshots.size() >= 4) {
                                         calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size, snapshots,
@@ -694,6 +696,7 @@ int main(int, char **) {
                             // List all snapshots
                             // TODO progress bar of how many snapshots need to be taken
                             if (!snapshots.empty()) {
+                                // List all snapshots
                                 ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 16);
                                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 11));
                                 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.2f, 0.2f, 0.2f, 0.2f));
@@ -711,10 +714,10 @@ int main(int, char **) {
                                     ImVec2 s(ImGui::GetContentRegionAvailWidth(),
                                              ImGui::GetTextLineHeight() + 4);
 
-                                    if (instance_errs.size() > i) {
+                                    if (instance_errs.size() > i && i != curr_snapshot) {
                                         ImVec4 color = interp_color(instance_errs[i], 0.0f, 1.0f);
-                                        color.x *= 0.56f;
-                                        color.y *= 0.83f;
+//                                        color.x *= 0.56f;
+//                                        color.y *= 0.83f;
                                         color.w *= 0.5f;
                                         drawList->AddRectFilled(ImVec2(p.x - 4, p.y - 4),
                                                                 ImVec2(p.x + s.x + 4, p.y + s.y),
@@ -729,14 +732,22 @@ int main(int, char **) {
                                     }
 
                                     if (is_selected) {
-//                                        ImGui::SetItemDefaultFocus();
-                                        drawList->AddRect(ImVec2(p.x - 5, p.y - 5),
-                                                          ImVec2(p.x + s.x + 5, p.y + s.y + 1),
-                                                          ImGui::GetColorU32(ImVec4(0.56f, 0.83f, 0.26f, 1.0f)),
+                                        ImVec4 color;
+                                        if (instance_errs.size() > i)
+                                            color = interp_color(instance_errs[i], 0.0f, 1.0f);
+                                        else
+                                            color = ImVec4(0.56f, 0.83f, 0.26f, 1.0f);
+                                        drawList->AddRect(ImVec2(p.x - 5, p.y - 4),
+                                                          ImVec2(p.x + s.x + 5, p.y + s.y),
+                                                          ImGui::GetColorU32(color),
                                                           3.0f, ImDrawCornerFlags_All, 3.0f);
                                         if (ImGui::BeginPopupContextItem()) {
                                             if (ImGui::Selectable("Remove")) {
                                                 snapshots.erase(snapshots.begin() + curr_snapshot);
+
+                                                // Update coverage
+                                                updateCoverage(snapshots, coverage);
+
                                                 curr_snapshot--;
                                                 if (snapshots.size() >= 4) {
                                                     calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size,
@@ -758,7 +769,7 @@ int main(int, char **) {
                         }
                         ImGui::EndTabItem();
                     } else {
-                        frame_corners.clear();
+                        frameCorners.points.clear();
                     }
                 }
 
@@ -843,7 +854,7 @@ int main(int, char **) {
                          ImGuiWindowFlags_NoTitleBar);
 
             if (cameraOn) {
-                if (cam.isStreaming()) {
+                if (curr_snapshot == -1) {
                     if (flip_img)
                         cv::flip(img, img, 1);
                     if (undistort) {
@@ -875,7 +886,7 @@ int main(int, char **) {
             ImVec2 pos = ImVec2((width_avail - img.cols) / 2 + ImGui::GetCursorPosX(),
                                 (height_avail - img.rows) / 2 + ImGui::GetCursorPosY());
             ImGui::SetCursorPos(pos);
-            ImGui::Image((void *) texture, ImVec2(img.cols, img.rows));
+            ImGui::Image((void *) (intptr_t) texture, ImVec2(img.cols, img.rows));
             cv::Point2f offset(pos.x + width_parameter_window, pos.y);
 
             // Draw Corners
@@ -887,23 +898,24 @@ int main(int, char **) {
                     p *= scaling;
                     p += offset;
                 }
-                ccalib::drawPoints(corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), size * 4.0f);
+                ccalib::drawPoints(corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), frame.size * 4.0f);
             }
 
             // Draw Frame around checkerboard
-            if (calibration_mode && !corners.empty() && !frame_corners.empty()) {
-                increaseRectSize(frame_corners, size * 64);
+            if (calibration_mode && !corners.empty() && !frameCorners.points.empty()) {
+                relativeToAbsPoints(frameCorners.points, img_size_old);
+                increaseRectSize(frameCorners.points, frame.size * 64);
                 if (flip_img) {
-                    flipPoints(frame_corners, img_size_old);
+                    flipPoints(frameCorners.points, img_size_old);
                 }
 
                 // Convert to img coordinates
-                for (auto &p : frame_corners) {
+                for (auto &p : frameCorners.points) {
                     p *= scaling;
                     p += offset;
                 }
                 if (curr_target >= target_frames.size())
-                    ccalib::drawRectangle(frame_corners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
+                    ccalib::drawRectangle(frameCorners.points, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
             }
 
             // Draw target frames
@@ -916,20 +928,20 @@ int main(int, char **) {
 
                 float chkbrd_ratio = (float) chkbrd_cols / (float) chkbrd_rows;
                 float ratio_offset = (img.rows * camParams.ratio - img.rows * chkbrd_ratio) / 2.0f;
-                for (int i = 0; i < frame_corners.size(); i++) {
+                for (int i = 0; i < frameCorners.points.size(); i++) {
                     target_corners[i].x = target_corners[i].x * img.rows * chkbrd_ratio + ratio_offset + offset.x;
                     target_corners[i].y = target_corners[i].y * img.rows + offset.y;
                 }
 
-                if (!corners.empty() && !frame_corners.empty() && curr_snapshot == -1) {
+                if (!corners.empty() && !frameCorners.points.empty() && curr_snapshot == -1) {
                     double dist = cv::norm((target_corners[0] + (target_corners[2] - target_corners[0]) / 2) -
-                                           (frame_corners[0] + (frame_corners[2] - frame_corners[0]) / 2));
-                    double frameArea = cv::contourArea(frame_corners);
+                                           (frameCorners.topLeft() + (frameCorners.bottomRight() - frameCorners.topLeft()) / 2));
+                    double frameArea = cv::contourArea(frameCorners.points);
                     double targetArea = cv::contourArea(target_corners);
 
                     ImVec4 col_bg = interp_color((float) dist, 0, img.rows / 2.0f);
 
-                    if (dist <= size * 64 * scaling && frameArea > targetArea * 0.8f && frameArea < targetArea * 1.2f) {
+                    if (dist <= frame.size * 64 * scaling && frameArea > targetArea * 0.8f && frameArea < targetArea * 1.2f) {
                         if (!taking_snapshot) {
                             taking_snapshot = true;
                         }
@@ -943,7 +955,7 @@ int main(int, char **) {
 
                     double area_diff = abs(1.0f - (float) frameArea / (float) targetArea);
                     col_bg = interp_color((float) area_diff, 0, 1.0f);
-                    ccalib::drawRectangle(frame_corners, col_bg, 4.0f, true);
+                    ccalib::drawRectangle(frameCorners.points, col_bg, 4.0f, true);
                 }
             }
 

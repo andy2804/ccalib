@@ -16,6 +16,22 @@ namespace ccalib {
         float x, y, size, skew;
     };
 
+    struct Corners {
+        std::vector<cv::Point2f> points;
+        Corners() : points{{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}} {}
+        Corners(std::initializer_list<cv::Point2f> list) { for (auto &e : list) points.push_back(e); }
+        cv::Point2f topLeft() { return points[0]; }
+        cv::Point2f topRight() { return points[1]; }
+        cv::Point2f bottomRight() { return points[2]; }
+        cv::Point2f bottomLeft() { return points[3]; }
+    };
+
+    struct Frame {
+        cv::Point2f pos = cv::Point2f(0.5f, 0.5f);
+        float size = 0.5f;
+        float skew = 0.5f;
+    };
+
     struct CameraParameters {
         bool autoExposure;
         int width;
@@ -24,6 +40,17 @@ namespace ccalib {
         float exposure;
         float ratio;
         std::string format;
+    };
+
+    struct CoverageParameters {
+        float x_min = 1.0f;
+        float x_max = 0.0f;
+        float y_min = 1.0f;
+        float y_max = 0.0f;
+        float size_min = 1.0f;
+        float size_max = 0.0f;
+        float skew_min = 1.0f;
+        float skew_max = 0.0f;
     };
 
     struct GUIStateVariables {
@@ -36,8 +63,7 @@ namespace ccalib {
         bool show_snapshots_card = true;
         bool show_result_card = true;
         bool calibration_mode = false;
-        bool camera_on = false;
-        bool stream_on = false;
+        bool cameraOn = false;
         bool changed = false;
         bool flip_img = false;
         bool undistort = false;
