@@ -70,6 +70,8 @@ namespace ccalib {
         double getRatio();
 
         void open(const std::string &device_address);
+
+        int getFrameCount();
     };
 
 } // namespace ccalib

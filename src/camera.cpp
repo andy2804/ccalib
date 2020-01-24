@@ -138,6 +138,10 @@ namespace ccalib {
         return params.ratio;
     }
 
+    int Camera::getFrameCount() {
+        return frameCount;
+    }
+
     void Camera::close() {
         while (streamOn) {
             streamFlag = false;
@@ -168,8 +172,7 @@ namespace ccalib {
     int Camera::captureFrame(cv::Mat &destination) {
         // Retrieve latest frame if camera is streaming, else return black frame
         if (streamOn && !image.empty()) {
-            image.copyTo(destination);
-            cv::cvtColor(destination, destination, cv::COLOR_BGR2RGB);
+            cv::cvtColor(image, destination, cv::COLOR_BGR2RGB);
             return frameCount;
         } else {
             destination = cv::Mat::zeros(params.height, params.width, CV_8UC3);

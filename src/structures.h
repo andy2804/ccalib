@@ -28,12 +28,14 @@ namespace ccalib {
     struct ImageInstance {
         cv::Mat data;
         int id = 0;
-        ImageInstance() {}
+        bool hasCheckerboard = false;
+        ImageInstance() = default;
         ImageInstance(const cv::Size &size, const int &type) { data = cv::Mat::zeros(size, type); }
     };
 
     struct Snapshot {
         ImageInstance img;
+        Corners frameCorners;
         CheckerboardFrame frame;
         std::vector<cv::Point2f> corners;
     };
@@ -95,7 +97,7 @@ namespace ccalib {
         cv::Mat D = cv::Mat::zeros(8, 1, CV_64F);
         cv::Mat P = cv::Mat::zeros(3, 4, CV_64F);
         std::vector<cv::Mat> R, T;
-        double reprojection_err = DBL_MAX;
+        double reprojErr = DBL_MAX;
     };
 
 } // namespace ccalib

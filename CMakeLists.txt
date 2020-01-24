@@ -36,6 +36,8 @@ set(sources
     include/imgui/imgui_impl_sdl.h
         src/camera.cpp
         src/camera.h
+        src/calibrator.cpp
+        src/calibrator.h
         src/structures.h
         src/functions.cpp
         src/functions.h
