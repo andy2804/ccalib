@@ -9,13 +9,6 @@
 
 namespace ccalib {
 
-    struct Snapshot {
-        timeval id;
-        cv::Mat img;
-        std::vector<cv::Point2f> corners;
-        float x, y, size, skew;
-    };
-
     struct Corners {
         std::vector<cv::Point2f> points;
         Corners() : points{{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}} {}
@@ -26,10 +19,23 @@ namespace ccalib {
         cv::Point2f bottomLeft() { return points[3]; }
     };
 
-    struct Frame {
+    struct CheckerboardFrame {
         cv::Point2f pos = cv::Point2f(0.5f, 0.5f);
         float size = 0.5f;
         float skew = 0.5f;
+    };
+
+    struct ImageInstance {
+        cv::Mat data;
+        int id = 0;
+        ImageInstance() {}
+        ImageInstance(const cv::Size &size, const int &type) { data = cv::Mat::zeros(size, type); }
+    };
+
+    struct Snapshot {
+        ImageInstance img;
+        CheckerboardFrame frame;
+        std::vector<cv::Point2f> corners;
     };
 
     struct CameraParameters {

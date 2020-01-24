@@ -90,14 +90,14 @@ double computeReprojectionErrors(const vector<vector<cv::Point3f> > &objectPoint
     return std::sqrt(totalErr / totalPoints);              // calculate the arithmetical mean
 }
 
-bool calibrateCamera(const int &chkbrd_rows, const int &chkbrd_cols, const float &chkbrd_size,
+bool calibrateCamera(const int &rows, const int &cols, const float &size,
                      vector<ccalib::Snapshot> instances, vector<cv::Mat> &R, vector<cv::Mat> &T,
-                     cv::Mat &K, cv::Mat &D, vector<float> &instance_errs, double &reprojection_err) {
+                     cv::Mat &K, cv::Mat &D, vector<float> &errs, double &reprojErr) {
     // Initialize values
     vector<cv::Point3f> corners3d;
-    for (int i = 0; i < chkbrd_rows - 1; ++i)
-        for (int j = 0; j < chkbrd_cols - 1; ++j)
-            corners3d.emplace_back(j * chkbrd_size, i * chkbrd_size, 0);
+    for (int i = 0; i < rows - 1; ++i)
+        for (int j = 0; j < cols - 1; ++j)
+            corners3d.emplace_back(j * size, i * size, 0);
 
     vector<vector<cv::Point2f>> imgPoints;
     vector<vector<cv::Point3f>> objPoints;
@@ -106,22 +106,22 @@ bool calibrateCamera(const int &chkbrd_rows, const int &chkbrd_cols, const float
         objPoints.push_back(corners3d);
     }
 
-    const int camera_width = instances[0].img.cols;
-    const int camera_height = instances[0].img.rows;
+    const int camera_width = instances[0].img.data.cols;
+    const int camera_height = instances[0].img.data.rows;
 
     cv::calibrateCamera(objPoints, imgPoints, cv::Size(camera_width, camera_height),
                         K, D, R, T, CV_CALIB_FIX_ASPECT_RATIO | CV_CALIB_FIX_K4 | CV_CALIB_FIX_K5);
 
-    reprojection_err = computeReprojectionErrors(objPoints, imgPoints, R, T, K, D, instance_errs);
-    return reprojection_err <= 0.3;
+    reprojErr = computeReprojectionErrors(objPoints, imgPoints, R, T, K, D, errs);
+    return reprojErr <= 0.3;
 }
 
-void flipPoints(vector<cv::Point2f> &points, const cv::Size &img_size, const int &direction = 0) {
+void flipPoints(vector<cv::Point2f> &points, const cv::Size &imgSize, const int &direction = 0) {
     for (auto &p : points) {
         if (direction)
-            p.y = img_size.height - p.y;
+            p.y = imgSize.height - p.y;
         else
-            p.x = img_size.width - p.x;
+            p.x = imgSize.width - p.x;
     }
 }
 
@@ -138,24 +138,24 @@ void increaseRectSize(vector<cv::Point2f> &corners, const float &padding) {
     }
 }
 
-void relativeToAbsPoint(cv::Point2f &point, const cv::Size &img_size) {
-    point.x *= img_size.width;
-    point.y *= img_size.height;
+void relativeToAbsPoint(cv::Point2f &point, const cv::Size &imgSize) {
+    point.x *= imgSize.width;
+    point.y *= imgSize.height;
 }
 
-void absToRelativePoint(cv::Point2f &point, const cv::Size &img_size) {
-    point.x /= img_size.width;
-    point.y /= img_size.height;
+void absToRelativePoint(cv::Point2f &point, const cv::Size &imgSize) {
+    point.x /= imgSize.width;
+    point.y /= imgSize.height;
 }
 
-void relativeToAbsPoints(vector<cv::Point2f> &points, const cv::Size &img_size) {
+void relativeToAbsPoints(vector<cv::Point2f> &points, const cv::Size &imgSize) {
     for (auto &p : points)
-        relativeToAbsPoint(p, img_size);
+        relativeToAbsPoint(p, imgSize);
 }
 
-void absToRelativePoints(vector<cv::Point2f> &points, const cv::Size &img_size) {
+void absToRelativePoints(vector<cv::Point2f> &points, const cv::Size &imgSize) {
     for (auto &p : points)
-        absToRelativePoint(p, img_size);
+        absToRelativePoint(p, imgSize);
 }
 
 void updateCoverage(const vector<ccalib::Snapshot> &snapshots, ccalib::CoverageParameters &coverage) {
@@ -164,14 +164,14 @@ void updateCoverage(const vector<ccalib::Snapshot> &snapshots, ccalib::CoverageP
 
     // Loop through all snapshots
     for (const auto &s : snapshots) {
-        newCoverage.x_min = min(newCoverage.x_min, 1.0f - s.x);
-        newCoverage.x_max = max(newCoverage.x_max, 1.0f - s.x);
-        newCoverage.y_min = min(newCoverage.y_min, 1.0f - s.y);
-        newCoverage.y_max = max(newCoverage.y_max, 1.0f - s.y);
-        newCoverage.size_min = min(newCoverage.size_min, s.size);
-        newCoverage.size_max = max(newCoverage.size_max, s.size);
-        newCoverage.skew_min = min(newCoverage.skew_min, s.skew);
-        newCoverage.skew_max = max(newCoverage.skew_max, s.skew);
+        newCoverage.x_min = min(newCoverage.x_min, 1.0f - s.frame.pos.x);
+        newCoverage.x_max = max(newCoverage.x_max, 1.0f - s.frame.pos.x);
+        newCoverage.y_min = min(newCoverage.y_min, 1.0f - s.frame.pos.y);
+        newCoverage.y_max = max(newCoverage.y_max, 1.0f - s.frame.pos.y);
+        newCoverage.size_min = min(newCoverage.size_min, s.frame.size);
+        newCoverage.size_max = max(newCoverage.size_max, s.frame.size);
+        newCoverage.skew_min = min(newCoverage.skew_min, s.frame.skew);
+        newCoverage.skew_max = max(newCoverage.skew_max, s.frame.skew);
     }
 
     coverage = newCoverage;
@@ -266,7 +266,7 @@ int main(int, char **) {
     camParams.format = "YUVY";
 
     // Calibration specific state variables
-    ccalib::Frame frame;
+    ccalib::CheckerboardFrame frame;
     int chkbrd_rows = 8;
     int chkbrd_cols = 11;
     float chkbrd_size = 0.022;      // in [m]
@@ -332,8 +332,10 @@ int main(int, char **) {
     // TODO Use v4l2 VIDIOC_ENUM_FMT to read out all valid formats
     vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
     vector<string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
-    cv::Mat img = cv::Mat::zeros(cv::Size(camParams.width, camParams.height), CV_8UC3);
-    cv::Mat img_prev = cv::Mat::zeros(cv::Size(camParams.width, camParams.height), CV_8UC3);
+//    cv::Mat img = cv::Mat::zeros(cv::Size(camParams.width, camParams.height), CV_8UC3);
+//    cv::Mat img_prev = cv::Mat::zeros(cv::Size(camParams.width, camParams.height), CV_8UC3);
+    ccalib::ImageInstance img(cv::Size(camParams.width, camParams.height), CV_8UC3);
+    ccalib::ImageInstance imgPrev(cv::Size(camParams.width, camParams.height), CV_8UC3);
     GLuint texture;
 
     // ==========================================
@@ -502,7 +504,7 @@ int main(int, char **) {
                                     camFMT = i;
                                     if (!ImGui::IsMouseClicked(0)) {
                                         camParams.format = camera_fmt[camFMT];
-                                        cam.updateFormat(camParams.format );
+                                        cam.updateFormat(camParams.format);
                                     }
                                 }
                                 if (is_selected)
@@ -542,7 +544,7 @@ int main(int, char **) {
                             calibration_mode = !calibration_mode;
                             if (cameraOn && calibration_mode) {
                                 ccalib::CoverageParameters newCoverage;
-                                ccalib::Frame newFrame;
+                                ccalib::CheckerboardFrame newFrame;
                                 coverage = newCoverage;
                                 frame = newFrame;
                                 reprojection_err = DBL_MAX;
@@ -571,8 +573,7 @@ int main(int, char **) {
                 }
 
                 if (cam.isStreaming()) {
-                    cam.captureFrame(img);
-                    cv::cvtColor(img, img, CV_BGR2RGB);
+                    img.id = cam.captureFrame(img.data);
                 }
 
                 // ==========================================
@@ -584,16 +585,19 @@ int main(int, char **) {
 
                         // Detect Checkerboard
                         if (cam.isStreaming()) {
-                            cv::Mat gray(img.rows, img.cols, CV_8UC1);
-                            cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
-                            cv::cvtColor(gray, img, cv::COLOR_GRAY2RGB);
+                            cv::Mat gray(img.data.rows, img.data.cols, CV_8UC1);
+                            cv::cvtColor(img.data, gray, cv::COLOR_RGB2GRAY);
+                            cv::cvtColor(gray, img.data, cv::COLOR_GRAY2RGB);
                             findCorners(gray, corners, chkbrd_cols, chkbrd_rows);
 
                             if (corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
-                                ccalib::Corners fc({corners[0], corners[chkbrd_cols - 2], corners[corners.size() - 1], corners[corners.size() - chkbrd_cols + 1]});
+                                ccalib::Corners fc({corners[0], corners[chkbrd_cols - 2], corners[corners.size() - 1],
+                                                    corners[corners.size() - chkbrd_cols + 1]});
                                 absToRelativePoints(fc.points, cv::Size(camParams.width, camParams.height));
-                                double width = max(cv::norm(fc.topRight() - fc.topLeft()), cv::norm(fc.bottomRight() - fc.bottomLeft()));
-                                double height = max(cv::norm(fc.bottomLeft() - fc.topLeft()), cv::norm(fc.bottomRight() - fc.topRight()));
+                                double width = max(cv::norm(fc.topRight() - fc.topLeft()),
+                                                   cv::norm(fc.bottomRight() - fc.bottomLeft()));
+                                double height = max(cv::norm(fc.bottomLeft() - fc.topLeft()),
+                                                    cv::norm(fc.bottomRight() - fc.topRight()));
                                 frame.pos = fc.topLeft() + (fc.bottomRight() - fc.topLeft()) / 2;
                                 frame.size = (float) sqrt(width * height);
                                 frame.skew = (float) log(width / height / skewRatio * camParams.ratio) / 3.0f + 0.5f;
@@ -625,11 +629,13 @@ int main(int, char **) {
                         }
 
                         // Snapshots Card
-                        if (ccalib::BeginCard("Snapshots", font_title, 3.3f + snapshots.size() * 0.76f, show_snapshots_card)) {
+                        if (ccalib::BeginCard("Snapshots", font_title, 3.3f + snapshots.size() * 0.76f,
+                                              show_snapshots_card)) {
                             // Collect snapshot button
                             // TODO automatic collection of snapshots
                             const char *status_text;
-                            if (ccalib::MaterialButton("Snapshot", !calibrated && snapshots.size() < 4) && cam.isStreaming())
+                            if (ccalib::MaterialButton("Snapshot", !calibrated && snapshots.size() < 4) &&
+                                cam.isStreaming())
                                 taking_snapshot = true;
 
                             if (taking_snapshot)
@@ -638,38 +644,35 @@ int main(int, char **) {
                                 status_text = "Ready";
                             else
                                 status_text = "No Checkerboard detected!";
-                            float movement_ind = 0.0f;
+                            float movement = 0.0f;
 
                             if (cam.isStreaming() && corners.size() == ((chkbrd_cols - 1) * (chkbrd_rows - 1))) {
                                 // Compare actual frame with previous frame for movement
                                 cv::Rect rect = cv::minAreaRect(corners).boundingRect();
-                                cv::Mat old_img;
-                                cv::Mat new_img;
+                                cv::Mat oldImg;
+                                cv::Mat newImg;
                                 if (rect.x > 0 && rect.y > 0 && rect.x + rect.width < camParams.width &&
                                     rect.y + rect.height < camParams.height) {
-                                    old_img = img_prev(rect);
-                                    new_img = img(rect);
+                                    oldImg = imgPrev.data(rect);
+                                    newImg = img.data(rect);
                                 } else {
-                                    img_prev.copyTo(old_img);
-                                    img.copyTo(new_img);
+                                    imgPrev.data.copyTo(oldImg);
+                                    img.data.copyTo(newImg);
                                 }
-                                cv::cvtColor(old_img, old_img, cv::COLOR_RGB2GRAY);
-                                cv::cvtColor(new_img, new_img, cv::COLOR_RGB2GRAY);
-                                cv::Mat diff(old_img.rows, old_img.cols, CV_8UC1);
-                                cv::absdiff(old_img, new_img, diff);
+                                cv::cvtColor(oldImg, oldImg, cv::COLOR_RGB2GRAY);
+                                cv::cvtColor(newImg, newImg, cv::COLOR_RGB2GRAY);
+                                cv::Mat diff(oldImg.rows, oldImg.cols, CV_8UC1);
+                                cv::absdiff(oldImg, newImg, diff);
                                 cv::Scalar mean_diff = cv::mean(diff);
-                                movement_ind = 1.0f - (float) mean_diff.val[0] / 127.0f;
+                                movement = 1.0f - (float) mean_diff.val[0] / 127.0f;
 
                                 // If successful, add instance
                                 if (taking_snapshot && mean_diff.val[0] < 4) {
                                     ccalib::Snapshot instance;
-                                    gettimeofday(&instance.id, nullptr);
-                                    img.copyTo(instance.img);
+                                    img.data.copyTo(instance.img.data);
+                                    instance.img.id = img.id;
                                     instance.corners.assign(corners.begin(), corners.end());
-                                    instance.x = frame.pos.x;
-                                    instance.y = frame.pos.y;
-                                    instance.size = frame.size;
-                                    instance.skew = frame.skew;
+                                    instance.frame = frame;
                                     snapshots.push_back(instance);
 
                                     // Update coverage
@@ -690,7 +693,7 @@ int main(int, char **) {
 
                             ImGui::SameLine();
                             ImGui::Text("%s", status_text);
-                            ccalib::CoveredBar(0.0f, movement_ind);
+                            ccalib::CoveredBar(0.0f, movement);
 
                             // List all snapshots
                             // TODO progress bar of how many snapshots need to be taken
@@ -698,7 +701,7 @@ int main(int, char **) {
                                 // List all snapshots
                                 ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 16);
                                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 11));
-                                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.2f, 0.2f, 0.2f, 0.2f));
+                                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.2f, 0.2f, 0.2f, 0.0f));
                                 ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0f, 1.0f, 1.0f, 0.8f));
                                 ImGui::BeginColumns("##snapshots", 1, ImGuiColumnsFlags_NoBorder);
                                 ImGui::BeginGroup();
@@ -707,39 +710,38 @@ int main(int, char **) {
                                     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4);
                                     bool is_selected = i == snapID;
                                     string text;
-                                    double stamp = snapshots[i].id.tv_sec + (snapshots[i].id.tv_usec / 1e6);
-                                    text = to_string(i) + ": " + to_string(stamp);
+                                    int stamp = snapshots[i].img.id;
+                                    text = to_string(i) + " FrameID: " + to_string(stamp);
                                     ImVec2 p = ImGui::GetCursorScreenPos();
                                     ImVec2 s(ImGui::GetContentRegionAvailWidth(),
                                              ImGui::GetTextLineHeight() + 4);
 
-                                    if (instance_errs.size() > i && i != snapID) {
-                                        ImVec4 color = ccalib::interp_color(instance_errs[i], 0.0f, 1.0f);
-//                                        color.x *= 0.56f;
-//                                        color.y *= 0.83f;
-                                        color.w *= 0.5f;
-                                        drawList->AddRectFilled(ImVec2(p.x - 4, p.y - 4),
-                                                                ImVec2(p.x + s.x + 4, p.y + s.y),
-                                                                ImGui::GetColorU32(color), 3.0f);
-                                    }
+                                    ImVec4 color;
+                                    if (instance_errs.size() > i) {
+                                        color = ccalib::interp_color(instance_errs[i], 0.0f, 1.0f);
+                                        if (i != snapID)
+                                            drawList->AddRectFilled(ImVec2(p.x - 4, p.y - 4),
+                                                                    ImVec2(p.x + s.x + 4, p.y + s.y),
+                                                                    ImGui::GetColorU32(
+                                                                            ImVec4(color.x, color.y, color.z, 0.5f)),
+                                                                    3.0f);
+                                    } else
+                                        color = ImVec4(0.56f, 0.83f, 0.26f, 1.0f);
 
-                                    if (ImGui::Selectable(text.c_str(), is_selected)) {
-                                        if (is_selected)
-                                            snapID = -1;
-                                        else
-                                            snapID = i;
-                                    }
+                                    if (ImGui::Selectable(text.c_str(), is_selected))
+                                        snapID = is_selected ? -1 : i;
+
+                                    if (ImGui::IsItemHovered())
+                                        drawList->AddRect(ImVec2(p.x - 5, p.y - 4),
+                                                          ImVec2(p.x + s.x + 5, p.y + s.y),
+                                                          ImGui::GetColorU32(ImVec4(color.x, color.y, color.z, 0.75f)),
+                                                          3.0f, ImDrawCornerFlags_All, 2.0f);
 
                                     if (is_selected) {
-                                        ImVec4 color;
-                                        if (instance_errs.size() > i)
-                                            color = ccalib::interp_color(instance_errs[i], 0.0f, 1.0f);
-                                        else
-                                            color = ImVec4(0.56f, 0.83f, 0.26f, 1.0f);
                                         drawList->AddRect(ImVec2(p.x - 5, p.y - 4),
                                                           ImVec2(p.x + s.x + 5, p.y + s.y),
                                                           ImGui::GetColorU32(color),
-                                                          3.0f, ImDrawCornerFlags_All, 3.0f);
+                                                          3.0f, ImDrawCornerFlags_All, 2.0f);
                                         if (ImGui::BeginPopupContextItem()) {
                                             if (ImGui::Selectable("Remove")) {
                                                 snapshots.erase(snapshots.begin() + snapID);
@@ -780,8 +782,9 @@ int main(int, char **) {
                     if (ImGui::BeginTabItem("Results")) {
                         // Results Card
                         if (ccalib::BeginCard("Results", font_title, 7.5,
-                                      show_result_card)) {
-                            if (ccalib::MaterialButton("Re-Calibrate", false) || snapshots.size() != instance_errs.size()) {
+                                              show_result_card)) {
+                            if (ccalib::MaterialButton("Re-Calibrate", false) ||
+                                snapshots.size() != instance_errs.size()) {
                                 calibrated = calibrateCamera(chkbrd_rows, chkbrd_cols, chkbrd_size, snapshots, R, T, K,
                                                              D, instance_errs, reprojection_err);
                                 undistort = true;
@@ -825,16 +828,17 @@ int main(int, char **) {
                 ImGui::EndTabBar();
 
                 if (snapID != -1) {
+                    cam.stopStream();
                     img = snapshots[snapID].img;
                     corners = snapshots[snapID].corners;
-                    frame.size = snapshots[snapID].size;
+                    frame = snapshots[snapID].frame;
                 } else if (cam.isOpened() && !cam.isStreaming()) {
-                    cam.captureFrame(img);
-                    cv::cvtColor(img, img, CV_BGR2RGB);
+                    cam.startStream();
+                    img.id = cam.captureFrame(img.data);
                 }
             }
 
-            img.copyTo(img_prev);
+            imgPrev = img;
 
             ImGui::End();
         }
@@ -856,37 +860,38 @@ int main(int, char **) {
             if (cameraOn) {
                 if (snapID == -1) {
                     if (flip_img)
-                        cv::flip(img, img, 1);
+                        cv::flip(img.data, img.data, 1);
                     if (undistort) {
                         cv::Mat undistorted;
-                        cv::undistort(img, undistorted, K, D);
-                        undistorted.copyTo(img);
+                        cv::undistort(img.data, undistorted, K, D);
+                        undistorted.copyTo(img.data);
                     }
                 }
                 glDeleteTextures(1, &texture);
-                mat2Texture(img, texture);
+                mat2Texture(img.data, texture);
             }
 
             // Camera image
             float width_avail = ImGui::GetContentRegionAvail().x;
             float height_avail = ImGui::GetContentRegionAvail().y;
             float scaling = 1.0f;
-            cv::Size img_size_old(img.cols, img.rows);
-            if (!img.empty()) {
+            cv::Size img_size_old(img.data.cols, img.data.rows);
+            if (!img.data.empty()) {
                 if (height_avail * camParams.ratio > width_avail) {
-                    scaling = width_avail / img.cols;
-                    cv::resize(img, img, cv::Size((int) width_avail, (int) (width_avail / camParams.ratio)));
+                    scaling = width_avail / img.data.cols;
+                    cv::resize(img.data, img.data, cv::Size((int) width_avail, (int) (width_avail / camParams.ratio)));
                 } else {
-                    scaling = height_avail / img.rows;
-                    cv::resize(img, img, cv::Size((int) (height_avail * camParams.ratio), (int) height_avail));
+                    scaling = height_avail / img.data.rows;
+                    cv::resize(img.data, img.data,
+                               cv::Size((int) (height_avail * camParams.ratio), (int) height_avail));
                 }
             }
 
             // Positioning && Centering
-            ImVec2 pos = ImVec2((width_avail - img.cols) / 2 + ImGui::GetCursorPosX(),
-                                (height_avail - img.rows) / 2 + ImGui::GetCursorPosY());
+            ImVec2 pos = ImVec2((width_avail - img.data.cols) / 2 + ImGui::GetCursorPosX(),
+                                (height_avail - img.data.rows) / 2 + ImGui::GetCursorPosY());
             ImGui::SetCursorPos(pos);
-            ImGui::Image((void *) (intptr_t) texture, ImVec2(img.cols, img.rows));
+            ImGui::Image((void *) (intptr_t) texture, ImVec2(img.data.cols, img.data.rows));
             cv::Point2f offset(pos.x + width_parameter_window, pos.y);
 
             // Draw Corners
@@ -927,21 +932,23 @@ int main(int, char **) {
                 }
 
                 float chkbrd_ratio = (float) chkbrd_cols / (float) chkbrd_rows;
-                float ratio_offset = (img.rows * camParams.ratio - img.rows * chkbrd_ratio) / 2.0f;
+                float ratio_offset = (img.data.rows * camParams.ratio - img.data.rows * chkbrd_ratio) / 2.0f;
                 for (int i = 0; i < frameCorners.points.size(); i++) {
-                    target_corners[i].x = target_corners[i].x * img.rows * chkbrd_ratio + ratio_offset + offset.x;
-                    target_corners[i].y = target_corners[i].y * img.rows + offset.y;
+                    target_corners[i].x = target_corners[i].x * img.data.rows * chkbrd_ratio + ratio_offset + offset.x;
+                    target_corners[i].y = target_corners[i].y * img.data.rows + offset.y;
                 }
 
                 if (!corners.empty() && !frameCorners.points.empty() && snapID == -1) {
                     double dist = cv::norm((target_corners[0] + (target_corners[2] - target_corners[0]) / 2) -
-                                           (frameCorners.topLeft() + (frameCorners.bottomRight() - frameCorners.topLeft()) / 2));
+                                           (frameCorners.topLeft() +
+                                            (frameCorners.bottomRight() - frameCorners.topLeft()) / 2));
                     double frameArea = cv::contourArea(frameCorners.points);
                     double targetArea = cv::contourArea(target_corners);
 
-                    ImVec4 col_bg = ccalib::interp_color((float) dist, 0, img.rows / 2.0f);
+                    ImVec4 col_bg = ccalib::interp_color((float) dist, 0, img.data.rows / 2.0f);
 
-                    if (dist <= frame.size * 64 * scaling && frameArea > targetArea * 0.8f && frameArea < targetArea * 1.2f) {
+                    if (dist <= frame.size * 64 * scaling && frameArea > targetArea * 0.8f &&
+                        frameArea < targetArea * 1.2f) {
                         if (!taking_snapshot) {
                             taking_snapshot = true;
                         }
@@ -966,9 +973,9 @@ int main(int, char **) {
                 else
                     reproj_error = "Reprojection Error: " + to_string(instance_errs[snapID]);
                 float text_width = ImGui::CalcTextSize(reproj_error.c_str()).x;
-                ImGui::SetCursorPos(ImVec2(pos.x + img.cols - text_width - 16, pos.y + 17));
+                ImGui::SetCursorPos(ImVec2(pos.x + img.data.cols - text_width - 16, pos.y + 17));
                 ImGui::TextColored(ImColor(0, 0, 0, 255), "%s", reproj_error.c_str());
-                ImGui::SetCursorPos(ImVec2(pos.x + img.cols - text_width - 16, pos.y + 16));
+                ImGui::SetCursorPos(ImVec2(pos.x + img.data.cols - text_width - 16, pos.y + 16));
                 ImGui::TextColored(ImColor(255, 255, 255, 255), "%s", reproj_error.c_str());
             }
 
@@ -976,9 +983,8 @@ int main(int, char **) {
             ImGui::PopStyleColor(1);
         }
 
-        // Show the big demo window
         if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
+            ImGui::ShowDemoWindow();
 
         // Rendering
         ImGui::Render();

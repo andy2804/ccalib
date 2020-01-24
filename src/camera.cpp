@@ -61,6 +61,7 @@ namespace ccalib {
             printf("Camera %s could not be opened!", device.c_str());
 
         // Update parameters
+        frameCount = 0;
         updateParameters();
     }
 
@@ -147,18 +148,33 @@ namespace ccalib {
 
     void Camera::grab() {
         while (streamFlag) {
-            if (camera.grab())
+            if (camera.grab()) {
                 camera.retrieve(image);
+                frameCount++;
+            }
         }
         streamOn = false;
     }
 
-    void Camera::captureFrame(cv::Mat &destination) {
+    /**
+     * Retrieves the latest frame by reference.
+     * If the camera is not streaming or the image is empty,
+     * a black frame will be returned instead.
+     * Also returns the frameCount.
+     *
+     * @param destination cv::Mat to hold the image
+     * @return frameCount or -1 if image is empty
+     */
+    int Camera::captureFrame(cv::Mat &destination) {
         // Retrieve latest frame if camera is streaming, else return black frame
-        if (streamOn && !image.empty())
+        if (streamOn && !image.empty()) {
             image.copyTo(destination);
-        else
+            cv::cvtColor(destination, destination, cv::COLOR_BGR2RGB);
+            return frameCount;
+        } else {
             destination = cv::Mat::zeros(params.height, params.width, CV_8UC3);
+            return -1;
+        }
     }
 
     void Camera::startStream() {

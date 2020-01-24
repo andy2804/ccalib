@@ -17,12 +17,15 @@ namespace ccalib {
     private:
         bool streamOn = false;
         bool streamFlag = false;
+        int frameCount = 0;
+
         std::string device = "/dev/video0";
         cv::VideoCapture camera;
         cv::Mat image;
 
-    public:
         ccalib::CameraParameters params;
+
+    public:
 
         Camera();
 
@@ -46,7 +49,7 @@ namespace ccalib {
 
         void grab();
 
-        void captureFrame(cv::Mat &destination);
+        int captureFrame(cv::Mat &destination);
 
         void updateResolution(const int &width, const int &height);
 
