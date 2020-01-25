@@ -7,7 +7,6 @@
 
 #include <string>
 #include <opencv2/opencv.hpp>
-#include <thread>
 #include "structures.h"
 
 namespace ccalib {
@@ -32,9 +31,9 @@ namespace ccalib {
                                      const std::vector<std::vector<cv::Point2f>> &imagePoints,
                                      const CalibrationParameters &params, std::vector<float> &perViewErrors);
 
-        bool calibrateCamera(std::vector<Snapshot> instances, CalibrationParameters &params, std::vector<float> &errs);
+        bool calibrateCamera(const std::vector<Snapshot> &instances, CalibrationParameters &params, std::vector<float> &errs);
 
-//        void calibrateCameraBG(std::vector<Snapshot> instances, CalibrationParameters &params, std::vector<float> &errs);
+        void calibrateCameraBG(const std::vector<Snapshot> &instances, CalibrationParameters &params, std::vector<float> &errs);
     };
 
 } // namespace ccalib

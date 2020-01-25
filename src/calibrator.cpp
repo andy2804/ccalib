@@ -62,13 +62,13 @@ namespace ccalib {
         return std::sqrt(totalErr / totalPoints); // calculate the arithmetical mean
     }
 
-//    void Calibrator::calibrateCameraBG(std::vector<ccalib::Snapshot> instances, ccalib::CalibrationParameters &params,
-//                                       std::vector<float> &errs) {
-//        std::thread t(&Calibrator::calibrateCamera, this, instances, params, errs);
-//        t.detach();
-//    }
+    void Calibrator::calibrateCameraBG(const std::vector<ccalib::Snapshot> &instances, ccalib::CalibrationParameters &params,
+                                       std::vector<float> &errs) {
+        std::thread t(&Calibrator::calibrateCamera, this, std::ref(instances), std::ref(params), std::ref(errs));
+        t.detach();
+    }
 
-    bool Calibrator::calibrateCamera(std::vector<ccalib::Snapshot> instances, ccalib::CalibrationParameters &params,
+    bool Calibrator::calibrateCamera(const std::vector<ccalib::Snapshot> &instances, ccalib::CalibrationParameters &params,
                                      std::vector<float> &errs) {
         // Initialize values
         std::vector<cv::Point3f> corners3d;
