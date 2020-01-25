@@ -25,99 +25,9 @@
 using namespace std;
 namespace fs = std::experimental::filesystem;
 
-void mat2Texture(cv::Mat &image, GLuint &imageTexture) {
-    if (image.empty()) {
-        std::cout << "image empty" << std::endl;
-    } else {
-        //glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-        glGenTextures(1, &imageTexture);
-        glBindTexture(GL_TEXTURE_2D, imageTexture);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        // Set texture clamping method
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-
-//        cv::cvtColor(image, image, CV_RGB2BGR);
-
-        glTexImage2D(GL_TEXTURE_2D,         // Type of texture
-                     0,                   // Pyramid level (for mip-mapping) - 0 is the top level
-                     GL_RGB,              // Internal colour format to convert to
-                     image.cols,          // Image width  i.e. 640 for Kinect in standard mode
-                     image.rows,          // Image height i.e. 480 for Kinect in standard mode
-                     0,                   // Border width in pixels (can either be 1 or 0)
-                     GL_RGB,              // Input image format (i.e. GL_RGB, GL_RGBA, GL_BGR etc.)
-                     GL_UNSIGNED_BYTE,    // Image data type
-                     image.ptr());        // The actual image data itself
-    }
-}
-
-void flipPoints(vector<cv::Point2f> &points, const cv::Size &imgSize, const int &direction = 0) {
-    for (auto &p : points) {
-        if (direction)
-            p.y = imgSize.height - p.y;
-        else
-            p.x = imgSize.width - p.x;
-    }
-}
-
-void increaseRectSize(vector<cv::Point2f> &corners, const float &padding) {
-    vector<cv::Point2f> dir, dir2;
-    for (int i = 0; i < corners.size(); i++) {
-        // Push points outwards in clockwise and anti-clockwise direction
-        dir.push_back(corners[i] - corners[(i + 1) % 4]);
-        dir2.push_back(corners[i] - corners[(i + 3) % 4]);
-    }
-    for (int i = 0; i < corners.size(); i++) {
-        corners[i] += (dir[i] * (padding / cv::norm(dir[i])));
-        corners[i] += (dir2[i] * (padding / cv::norm(dir2[i])));
-    }
-}
-
-void relativeToAbsPoint(cv::Point2f &point, const cv::Size &imgSize) {
-    point.x *= imgSize.width;
-    point.y *= imgSize.height;
-}
-
-void absToRelativePoint(cv::Point2f &point, const cv::Size &imgSize) {
-    point.x /= imgSize.width;
-    point.y /= imgSize.height;
-}
-
-void relativeToAbsPoints(vector<cv::Point2f> &points, const cv::Size &imgSize) {
-    for (auto &p : points)
-        relativeToAbsPoint(p, imgSize);
-}
-
-void absToRelativePoints(vector<cv::Point2f> &points, const cv::Size &imgSize) {
-    for (auto &p : points)
-        absToRelativePoint(p, imgSize);
-}
-
-void updateCoverage(const vector<ccalib::Snapshot> &snapshots, ccalib::CoverageParameters &coverage) {
-    // Get default values for coverage and safe current position
-    ccalib::CoverageParameters newCoverage;
-
-    // Loop through all snapshots
-    for (const auto &s : snapshots) {
-        newCoverage.x_min = min(newCoverage.x_min, 1.0f - s.frame.pos.x);
-        newCoverage.x_max = max(newCoverage.x_max, 1.0f - s.frame.pos.x);
-        newCoverage.y_min = min(newCoverage.y_min, 1.0f - s.frame.pos.y);
-        newCoverage.y_max = max(newCoverage.y_max, 1.0f - s.frame.pos.y);
-        newCoverage.size_min = min(newCoverage.size_min, s.frame.size);
-        newCoverage.size_max = max(newCoverage.size_max, s.frame.size);
-        newCoverage.skew_min = min(newCoverage.skew_min, s.frame.skew);
-        newCoverage.skew_max = max(newCoverage.skew_max, s.frame.skew);
-    }
-
-    coverage = newCoverage;
-}
-
 // Main code
 int main(int, char **) {
+
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
         printf("Error: %s\n", SDL_GetError());
@@ -207,6 +117,8 @@ int main(int, char **) {
     // Calibration specific state variables
     ccalib::CheckerboardFrame frame;
     ccalib::Calibrator calib(8, 11, 0.022);
+    ccalib::Corners frameCorners;
+    vector<cv::Point2f> corners;
     float skewRatio = ((calib.checkerboardCols - 1.0f) / (calib.checkerboardRows - 1.0f));
 
     // Coverage specific state variables
@@ -217,8 +129,6 @@ int main(int, char **) {
     int snapID = -1;
     vector<ccalib::Snapshot> snapshots;
     vector<float> instance_errs;
-    vector<cv::Point2f> corners;
-    ccalib::Corners frameCorners;
 
     // Initialize Target Frames for automatic collection
     int curr_target = 0;
@@ -532,7 +442,7 @@ int main(int, char **) {
                             if (img.hasCheckerboard) {
                                 ccalib::Corners fc({corners[0], corners[calib.checkerboardCols - 2], corners[corners.size() - 1],
                                                     corners[corners.size() - calib.checkerboardCols + 1]});
-                                absToRelativePoints(fc.points, cv::Size(camParams.width, camParams.height));
+                                ccalib::absToRelativePoints(fc.points, cv::Size(camParams.width, camParams.height));
                                 double width = max(cv::norm(fc.topRight() - fc.topLeft()),
                                                    cv::norm(fc.bottomRight() - fc.bottomLeft()));
                                 double height = max(cv::norm(fc.bottomLeft() - fc.topLeft()),
@@ -618,10 +528,10 @@ int main(int, char **) {
                                     snapshots.push_back(instance);
 
                                     // Update coverage
-                                    updateCoverage(snapshots, coverage);
+                                    ccalib::updateCoverage(snapshots, coverage);
 
                                     if (snapshots.size() >= 4) {
-                                        calib.calibrateCamera(snapshots, calibParams, instance_errs);
+                                        calib.calibrateCameraBG(snapshots, calibParams, instance_errs);
                                         calibrated = calibParams.reprojErr < 0.3f;
                                         undistort = true;
                                     }
@@ -688,11 +598,11 @@ int main(int, char **) {
                                                 snapshots.erase(snapshots.begin() + snapID);
 
                                                 // Update coverage
-                                                updateCoverage(snapshots, coverage);
+                                                ccalib::updateCoverage(snapshots, coverage);
 
                                                 snapID--;
                                                 if (snapshots.size() >= 4) {
-                                                    calib.calibrateCamera(snapshots, calibParams, instance_errs);
+                                                    calib.calibrateCameraBG(snapshots, calibParams, instance_errs);
                                                     calibrated = calibParams.reprojErr < 0.3f;
                                                 }
                                             }
@@ -726,7 +636,7 @@ int main(int, char **) {
                                               show_result_card)) {
                             if (ccalib::MaterialButton("Re-Calibrate", false) ||
                                 snapshots.size() != instance_errs.size()) {
-                                calib.calibrateCamera(snapshots, calibParams, instance_errs);
+                                calib.calibrateCameraBG(snapshots, calibParams, instance_errs);
                                 calibrated = calibParams.reprojErr < 0.3f;
                                 undistort = true;
                             }
@@ -810,7 +720,7 @@ int main(int, char **) {
                     }
                 }
                 glDeleteTextures(1, &texture);
-                mat2Texture(img.data, texture);
+                ccalib::mat2Texture(img.data, texture);
             }
 
             // Camera image
@@ -840,7 +750,7 @@ int main(int, char **) {
             if (calibration_mode && !corners.empty()) {
                 vector<cv::Point2f> drawCorners(corners);
                 if (flip_img && snapID == -1) {
-                    flipPoints(drawCorners, img_size_old);
+                    ccalib::flipPoints(drawCorners, img_size_old);
                 }
                 for (auto &p : drawCorners) {
                     p *= scaling;
@@ -852,10 +762,10 @@ int main(int, char **) {
             // Draw Frame around checkerboard
             ccalib::Corners drawFrameCorners = frameCorners;
             if (calibration_mode && !corners.empty() && !drawFrameCorners.points.empty()) {
-                relativeToAbsPoints(drawFrameCorners.points, img_size_old);
-                increaseRectSize(drawFrameCorners.points, frame.size * 64);
+                ccalib::relativeToAbsPoints(drawFrameCorners.points, img_size_old);
+                ccalib::increaseRectSize(drawFrameCorners.points, frame.size * 64);
                 if (flip_img) {
-                    flipPoints(drawFrameCorners.points, img_size_old);
+                    ccalib::flipPoints(drawFrameCorners.points, img_size_old);
                 }
 
                 // Convert to img coordinates
@@ -872,7 +782,7 @@ int main(int, char **) {
                 // Convert and flip points
                 vector<cv::Point2f> target_corners(target_frames[curr_target]);
                 if (flip_img) {
-                    flipPoints(target_corners, cv::Size(1, 1));
+                    ccalib::flipPoints(target_corners, cv::Size(1, 1));
                 }
 
                 float checkerboardRatio = (float) calib.checkerboardCols / (float) calib.checkerboardRows;
