@@ -416,8 +416,10 @@ int main(int, char **) {
             }
 
             if (cam.isStreaming()) {
-                if (cam.getFrameCount() != imgPrev.id)
+                if (cam.getFrameCount() != imgPrev.id) {
                     img.id = cam.captureFrame(img.data);
+                    img.hasCheckerboard = false;
+                }
                 else
                     img = imgPrev;
             }
@@ -452,7 +454,8 @@ int main(int, char **) {
                             frame.size = (float) sqrt(width * height);
                             frame.skew = (float) log(width / height / skewRatio * camParams.ratio) / 3.0f + 0.5f;
                             frameCorners = fc;
-                        }
+                        } else
+                            frameCorners.points.clear();
                     } else
                         img.hasCheckerboard = imgPrev.hasCheckerboard;
                 }
@@ -506,7 +509,7 @@ int main(int, char **) {
                     // If successful, add instance
                     if (takeSnapshot && imageMovement > 0.97f) {
                         ccalib::Snapshot instance;
-                        img.data.copyTo(instance.img.data);
+                        instance.img.data = img.data.clone();
                         instance.img.id = img.id;
                         instance.corners.assign(corners.begin(), corners.end());
                         instance.frame = frame;
@@ -644,6 +647,7 @@ int main(int, char **) {
             if (snapID != -1) {
                 cam.stopStream();
                 img = snapshots[snapID].img;
+                img.data = snapshots[snapID].img.data.clone();
                 corners = snapshots[snapID].corners;
                 frame = snapshots[snapID].frame;
                 frameCorners = snapshots[snapID].frameCorners;
@@ -654,9 +658,8 @@ int main(int, char **) {
         }
 
         imgPrev = img;
-
+        imgPrev.data = img.data.clone();
         ImGui::End();
-
 
         // ==========================================
         // IMAGE PREVIEW
@@ -673,41 +676,41 @@ int main(int, char **) {
                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                      ImGuiWindowFlags_NoTitleBar);
 
+        cv::Mat preview = img.data.clone();
         if (cameraOn) {
-            // FIXME not flipping or undistorting due to always img.id == imgPrev.id
-            if (snapID == -1 && img.id != imgPrev.id) {
-                if (flipImg) {
-                    cv::flip(img.data, img.data, 1);
-                }
+            if (snapID == -1) {
                 if (undistort) {
-                    cv::undistort(img.data, img.data, calibParams.K, calibParams.D);
+                    cv::undistort(img.data, preview, calibParams.K, calibParams.D);
+                }
+                if (flipImg) {
+                    cv::flip(preview, preview, 1);
                 }
             }
             glDeleteTextures(1, &texture);
-            ccalib::mat2Texture(img.data, texture);
+            ccalib::mat2Texture(preview, texture);
         }
 
         // Camera image
         float width_avail = ImGui::GetContentRegionAvail().x;
         float height_avail = ImGui::GetContentRegionAvail().y;
         float scaling = 1.0f;
-        cv::Size img_size_old(img.data.cols, img.data.rows);
-        if (!img.data.empty()) {
+        cv::Size img_size_old(preview.cols, preview.rows);
+        if (!preview.empty()) {
             if (height_avail * camParams.ratio > width_avail) {
-                scaling = width_avail / img.data.cols;
-                cv::resize(img.data, img.data, cv::Size((int) width_avail, (int) (width_avail / camParams.ratio)));
+                scaling = width_avail / preview.cols;
+                cv::resize(preview, preview, cv::Size((int) width_avail, (int) (width_avail / camParams.ratio)));
             } else {
-                scaling = height_avail / img.data.rows;
-                cv::resize(img.data, img.data,
+                scaling = height_avail / preview.rows;
+                cv::resize(preview, preview,
                            cv::Size((int) (height_avail * camParams.ratio), (int) height_avail));
             }
         }
 
         // Positioning && Centering
-        ImVec2 pos = ImVec2((width_avail - img.data.cols) / 2 + ImGui::GetCursorPosX(),
-                            (height_avail - img.data.rows) / 2 + ImGui::GetCursorPosY());
+        ImVec2 pos = ImVec2((width_avail - preview.cols) / 2 + ImGui::GetCursorPosX(),
+                            (height_avail - preview.rows) / 2 + ImGui::GetCursorPosY());
         ImGui::SetCursorPos(pos);
-        ImGui::Image((void *) (intptr_t) texture, ImVec2(img.data.cols, img.data.rows));
+        ImGui::Image((void *) (intptr_t) texture, ImVec2(preview.cols, preview.rows));
         cv::Point2f offset(pos.x + widthParameterWindow, pos.y);
 
         // Draw Corners
@@ -728,7 +731,7 @@ int main(int, char **) {
         if (calibrationMode && !corners.empty() && !drawFrameCorners.points.empty()) {
             ccalib::relativeToAbsPoints(drawFrameCorners.points, img_size_old);
             ccalib::increaseRectSize(drawFrameCorners.points, frame.size * 64);
-            if (flipImg) {
+            if (flipImg && snapID == -1) {
                 ccalib::flipPoints(drawFrameCorners.points, img_size_old);
             }
 
@@ -745,16 +748,16 @@ int main(int, char **) {
         if (calibrationMode && curr_target < target_frames.size()) {
             // Convert and flip points
             vector<cv::Point2f> target_corners(target_frames[curr_target]);
-            if (flipImg) {
+            if (flipImg && snapID == -1) {
                 ccalib::flipPoints(target_corners, cv::Size(1, 1));
             }
 
             float checkerboardRatio = (float) calib.checkerboardCols / (float) calib.checkerboardRows;
-            float ratioOffset = (img.data.rows * camParams.ratio - img.data.rows * checkerboardRatio) / 2.0f;
+            float ratioOffset = (preview.rows * camParams.ratio - preview.rows * checkerboardRatio) / 2.0f;
             for (int i = 0; i < drawFrameCorners.points.size(); i++) {
                 target_corners[i].x =
-                        target_corners[i].x * img.data.rows * checkerboardRatio + ratioOffset + offset.x;
-                target_corners[i].y = target_corners[i].y * img.data.rows + offset.y;
+                        target_corners[i].x * preview.rows * checkerboardRatio + ratioOffset + offset.x;
+                target_corners[i].y = target_corners[i].y * preview.rows + offset.y;
             }
 
             if (!corners.empty() && !drawFrameCorners.points.empty() && snapID == -1) {
@@ -764,7 +767,7 @@ int main(int, char **) {
                 double frameArea = cv::contourArea(drawFrameCorners.points);
                 double targetArea = cv::contourArea(target_corners);
 
-                ImVec4 col_bg = ccalib::interp_color((float) dist, 0, img.data.rows / 2.0f);
+                ImVec4 col_bg = ccalib::interp_color((float) dist, 0, preview.rows / 2.0f);
 
                 if (dist <= frame.size * 64 * scaling && frameArea > targetArea * 0.8f &&
                     frameArea < targetArea * 1.2f) {
@@ -792,9 +795,9 @@ int main(int, char **) {
             else
                 reproj_error = "Reprojection Error: " + to_string(instance_errs[snapID]);
             float text_width = ImGui::CalcTextSize(reproj_error.c_str()).x;
-            ImGui::SetCursorPos(ImVec2(pos.x + img.data.cols - text_width - 16, pos.y + 17));
+            ImGui::SetCursorPos(ImVec2(pos.x + preview.cols - text_width - 16, pos.y + 17));
             ImGui::TextColored(ImColor(0, 0, 0, 255), "%s", reproj_error.c_str());
-            ImGui::SetCursorPos(ImVec2(pos.x + img.data.cols - text_width - 16, pos.y + 16));
+            ImGui::SetCursorPos(ImVec2(pos.x + preview.cols - text_width - 16, pos.y + 16));
             ImGui::TextColored(ImColor(255, 255, 255, 255), "%s", reproj_error.c_str());
         }
 

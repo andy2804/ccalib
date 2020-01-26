@@ -191,7 +191,7 @@ namespace ccalib {
             float ANIM_SPEED = 0.32f;
             float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
             col_bg = ImGui::GetColorU32(
-                    ImLerp(ImVec4(0.56f, 0.83f, 0.26f, 1.0f), ImVec4(0.72f, 0.91f, 0.42f, 1.0f), t_anim));
+                    ImLerp(ImVec4(0.56f, 0.83f, 0.26f, 1.0f), ImVec4(0.72f, 0.91f, 0.72f, 1.0f), t_anim));
 
             draw_list->AddRect(ImVec2(p.x - padding, p.y - padding),
                                ImVec2(p.x + width + padding, p.y + height + padding), col_bg,
@@ -228,7 +228,7 @@ namespace ccalib {
             float ANIM_SPEED = 0.32f;
             float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
             col_bg = ImGui::GetColorU32(
-                    ImLerp(ImVec4(0.83f, 0.26f, 0.26f, 1.0f), ImVec4(0.91f, 0.42f, 0.42f, 1.0f), t_anim));
+                    ImLerp(ImVec4(0.83f, 0.26f, 0.26f, 1.0f), ImVec4(0.91f, 0.72f, 0.72f, 1.0f), t_anim));
 
             draw_list->AddRect(ImVec2(p.x - padding, p.y - padding),
                                ImVec2(p.x + width + padding, p.y + height + padding), col_bg,
