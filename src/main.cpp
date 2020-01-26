@@ -100,7 +100,8 @@ int main(int, char **) {
     bool showSnapshots = true;
     bool showResults = true;
     bool calibrationMode = false;
-    bool changed = false;
+    bool camParamsChanged = false;
+    bool frameChanged = false;
     bool cameraOn = false;
     bool flipImg = false;
     bool undistort = false;
@@ -236,7 +237,7 @@ int main(int, char **) {
                         cam.open();
                         cam.updateParameters(camParams);
                         cam.startStream();
-                        changed = true;
+                        camParamsChanged = true;
                     } else if (!cameraOn & ImGui::IsItemClicked(0)) {
                         cam.stopStream();
                         cam.close();
@@ -275,7 +276,7 @@ int main(int, char **) {
                                     style.FramePadding.x);
                     if (ccalib::MaterialButton(button_text)) {
                         cam.updateResolution(camParams.width, camParams.height);
-                        changed = true;
+                        camParamsChanged = true;
                     }
 
                     ImGui::AlignTextToFramePadding();
@@ -295,7 +296,7 @@ int main(int, char **) {
                                 ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
                         }
                         ImGui::EndCombo();
-                        changed = true;
+                        camParamsChanged = true;
                     }
 
                     ImGui::AlignTextToFramePadding();
@@ -322,7 +323,7 @@ int main(int, char **) {
                                 ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
                         }
                         ImGui::EndCombo();
-                        changed = true;
+                        camParamsChanged = true;
                     }
 
 
@@ -380,21 +381,25 @@ int main(int, char **) {
                 ImGui::EndTabItem();
             }
 
-            if (changed) {
+            if (camParamsChanged) {
                 // Update params
                 camParams = cam.getParameters();
                 for (int i = 0; i < camera_fps.size(); i++)
                     camFPS = (camera_fps[i] == camParams.fps) ? i : camFPS;
-                changed = false;
+                camParamsChanged = false;
             }
 
             if (cam.isStreaming()) {
                 if (cam.getFrameCount() != imgPrev.id) {
                     img.id = cam.captureFrame(img.data);
                     img.hasCheckerboard = false;
-                } else
+                    frameChanged = true;
+                } else {
                     img = imgPrev;
-            }
+                    frameChanged = false;
+                }
+            } else
+                frameChanged = false;
 
             // ==========================================
             // Calibration Snapshots
@@ -403,7 +408,7 @@ int main(int, char **) {
             if (calibrationMode && ImGui::BeginTabItem("Calibration")) {
 
                 // Detect Checkerboard
-                if (cam.isStreaming() && img.id != imgPrev.id) {
+                if (cam.isStreaming() && frameChanged) {
                     cv::Mat gray(img.data.rows, img.data.cols, CV_8UC1);
                     cv::cvtColor(img.data, gray, cv::COLOR_RGB2GRAY);
                     cv::cvtColor(gray, img.data, cv::COLOR_GRAY2RGB);
@@ -420,7 +425,7 @@ int main(int, char **) {
                         prior = prior & cv::boundingRect(priorFrameCorners.points);
                         gray = gray(prior);
                         cv::normalize(gray, gray, 255, 0, cv::NORM_MINMAX);
-                        priorScale = gray.cols / 640.0f;
+                        priorScale = min(1.0f, gray.cols / 480.0f);
                         cv::resize(gray, gray, cv::Size(int(gray.cols / priorScale), int(gray.rows / priorScale)), 0, 0,
                                    cv::INTER_LINEAR_EXACT);
                     }
@@ -490,7 +495,7 @@ int main(int, char **) {
                     }
 
                     // Compare actual frame with previous frame for movement
-                    if (img.id != imgPrev.id && img.hasCheckerboard) {
+                    if (frameChanged && img.hasCheckerboard) {
                         cv::Rect rect = cv::minAreaRect(corners).boundingRect();
                         imageMovement = ccalib::computeImageDiff(img.data, imgPrev.data, rect);
                     }
@@ -667,8 +672,10 @@ int main(int, char **) {
                 if (flipImg)
                     cv::flip(preview, preview, 1);
             }
-            glDeleteTextures(1, &texture);
-            ccalib::mat2Texture(preview, texture);
+            if (frameChanged) {
+                glDeleteTextures(1, &texture);
+                ccalib::mat2Texture(preview, texture);
+            }
         }
 
         // Resize Camera image
@@ -743,7 +750,7 @@ int main(int, char **) {
                     p *= scaling;
                     p += offset;
                 }
-                ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.56f, 0.83f, 0.26f, float(i) / n * 0.5f), 4.0f,
+                ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.56f, 0.83f, 0.26f, float(i) / n * 0.2f), 2.0f,
                                       false);
             }
         }

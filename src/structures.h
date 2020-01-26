@@ -71,7 +71,8 @@ namespace ccalib {
         bool showSnapshots = true;
         bool showResults = true;
         bool calibrationMode = false;
-        bool changed = false;
+        bool camParamsChanged = false;
+        bool frameChanged = false;
         bool cameraOn = false;
         bool flipImg = false;
         bool undistort = false;

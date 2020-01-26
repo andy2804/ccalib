@@ -151,6 +151,7 @@ namespace ccalib {
     }
 
     void Camera::grab() {
+        // TODO only decode needed images to make code more efficient
         while (streamFlag) {
             if (camera.grab()) {
                 camera.retrieve(image);

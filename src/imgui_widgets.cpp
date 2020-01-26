@@ -45,7 +45,7 @@ namespace ccalib {
                 cam.open();
                 cam.updateParameters(camParams);
                 cam.startStream();
-                state.changed = true;
+                state.camParamsChanged = true;
             } else if (!state.cameraOn & ImGui::IsItemClicked(0)) {
                 cam.stopStream();
                 cam.close();
