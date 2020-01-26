@@ -73,18 +73,30 @@ int main(int, char **) {
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Load Fonts
-    ImFont *font_normal = io.Fonts->AddFontFromFileTTF("../resources/Roboto-Regular.ttf", 16.0f);
-    ImFont *font_title = io.Fonts->AddFontFromFileTTF("../resources/Roboto-Medium.ttf", 24.0f);
+    ImFont *fontText = io.Fonts->AddFontFromFileTTF("../resources/Roboto-Regular.ttf", 16.0f);
+    ImFont *fontTitle = io.Fonts->AddFontFromFileTTF("../resources/Roboto-Medium.ttf", 24.0f);
+
+    // Initialize state variables
+    ccalib::GUIStateVariables state;
+    state.fontTitle = fontTitle;
+    state.widthParameterWindow = 350;
+    state.widthItemSpacing = (state.widthParameterWindow - ImGui::GetStyle().WindowPadding.x * 2) / 2;
+    state.camFPS = 4;
 
     // UI specific variables
+    int frameCount = 0;
+    int frameLastAction = 0;
     int widthParameterWindow = 350;
     float spacing = (widthParameterWindow - ImGui::GetStyle().WindowPadding.x * 2) / 2;
+    string loadingSequence = "/-\\|";
 
     // General State variables
+    // TODO create stateVariables struct
+    // TODO pack all Cards into single "widgets"
     bool showCamera = true;
     bool showParameters = false;
-    bool showCalibration = true;
-    bool showCoverage = false;
+    bool showCalibration = false;
+    bool showCoverage = true;
     bool showSnapshots = true;
     bool showResults = true;
     bool calibrationMode = false;
@@ -100,7 +112,6 @@ int main(int, char **) {
     int camID = 0;
     int camFPS = 4;
     int camFMT = 0;
-
     ccalib::CameraParameters camParams;
     camParams.width = 640;
     camParams.height = 480;
@@ -114,54 +125,23 @@ int main(int, char **) {
     ccalib::CheckerboardFrame frame;
     ccalib::Calibrator calib(8, 11, 0.022);
     ccalib::Corners frameCorners;
+
+    // TODO new implementation of target corners
+//    ccalib::Corners targetCorners;
+
     ccalib::CoverageParameters coverage;
     ccalib::CalibrationParameters calibParams;
-    vector <ccalib::Snapshot> snapshots;
-    vector <cv::Point2f> corners;
+    vector<ccalib::Snapshot> snapshots;
+    vector<cv::Point2f> corners;
     vector<double> instanceErrs;
-    float skewRatio = ((calib.checkerboardCols - 1.0f) / (calib.checkerboardRows - 1.0f));
     float imageMovement = 0.0f;
     int snapID = -1;
-
-    // Initialize Target Frames for automatic collection
-    int curr_target = 0;
-    vector<vector<cv::Point2f>> target_frames;
-    // Big Frame
-    target_frames.push_back({cv::Point2f(0.05f, 0.05f), cv::Point2f(0.95f, 0.05f),
-                             cv::Point2f(0.95f, 0.95f), cv::Point2f(0.05f, 0.95f)});
-    // 4 Medium Frames
-    target_frames.push_back({cv::Point2f(0.05f, 0.05f), cv::Point2f(0.55f, 0.05f),
-                             cv::Point2f(0.55f, 0.55f), cv::Point2f(0.05f, 0.55f)});
-    target_frames.push_back({cv::Point2f(0.45f, 0.05f), cv::Point2f(0.95f, 0.05f),
-                             cv::Point2f(0.95f, 0.55f), cv::Point2f(0.45f, 0.55f)});
-    target_frames.push_back({cv::Point2f(0.45f, 0.45f), cv::Point2f(0.95f, 0.45f),
-                             cv::Point2f(0.95f, 0.95f), cv::Point2f(0.45f, 0.95f)});
-    target_frames.push_back({cv::Point2f(0.05f, 0.45f), cv::Point2f(0.55f, 0.45f),
-                             cv::Point2f(0.55f, 0.95f), cv::Point2f(0.05f, 0.95f)});
-    // 9 Small Frames
-    target_frames.push_back({cv::Point2f(0.05f, 0.05f), cv::Point2f(0.35f, 0.05f),
-                             cv::Point2f(0.35f, 0.35f), cv::Point2f(0.05f, 0.35f)});
-    target_frames.push_back({cv::Point2f(0.35f, 0.05f), cv::Point2f(0.65f, 0.05f),
-                             cv::Point2f(0.65f, 0.35f), cv::Point2f(0.35f, 0.35f)});
-    target_frames.push_back({cv::Point2f(0.65f, 0.05f), cv::Point2f(0.95f, 0.05f),
-                             cv::Point2f(0.95f, 0.35f), cv::Point2f(0.65f, 0.35f)});
-    target_frames.push_back({cv::Point2f(0.65f, 0.35f), cv::Point2f(0.95f, 0.35f),
-                             cv::Point2f(0.95f, 0.65f), cv::Point2f(0.65f, 0.65f)});
-    target_frames.push_back({cv::Point2f(0.35f, 0.35f), cv::Point2f(0.65f, 0.35f),
-                             cv::Point2f(0.65f, 0.65f), cv::Point2f(0.35f, 0.65f)});
-    target_frames.push_back({cv::Point2f(0.05f, 0.35f), cv::Point2f(0.35f, 0.35f),
-                             cv::Point2f(0.35f, 0.65f), cv::Point2f(0.05f, 0.65f)});
-    target_frames.push_back({cv::Point2f(0.05f, 0.65f), cv::Point2f(0.35f, 0.65f),
-                             cv::Point2f(0.35f, 0.95f), cv::Point2f(0.05f, 0.95f)});
-    target_frames.push_back({cv::Point2f(0.35f, 0.65f), cv::Point2f(0.65f, 0.65f),
-                             cv::Point2f(0.65f, 0.95f), cv::Point2f(0.35f, 0.95f)});
-    target_frames.push_back({cv::Point2f(0.65f, 0.65f), cv::Point2f(0.95f, 0.65f),
-                             cv::Point2f(0.95f, 0.95f), cv::Point2f(0.65f, 0.95f)});
+    float snapshotDensity = 0.06f;
 
     // Camera Formats
     // TODO Use v4l2 VIDIOC_ENUM_FMT to read out all valid formats
     vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
-    vector <string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
+    vector<string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
     ccalib::ImageInstance img(cv::Size(camParams.width, camParams.height), CV_8UC3);
     ccalib::ImageInstance imgPrev(cv::Size(camParams.width, camParams.height), CV_8UC3);
     GLuint texture;
@@ -172,12 +152,14 @@ int main(int, char **) {
 
     // Get all v4l2 devices
     const fs::path device_dir("/dev");
-    vector <string> cameras;
+    vector<string> cameras;
 
     for (const auto &entry : fs::directory_iterator(device_dir)) {
         if (entry.path().string().find("video") != string::npos)
             cameras.push_back(entry.path());
     }
+
+    state.cameras = cameras;
 
     // Try to open connection to first camera in device list
     ccalib::Camera cam(cameras[camID], camParams);
@@ -223,7 +205,7 @@ int main(int, char **) {
 
             if (ImGui::BeginTabItem("Parameters")) {
                 // Camera Card
-                if (ccalib::BeginCard("Camera", font_title, 4.5f + calibrated, showCamera)) {
+                if (ccalib::BeginCard("Camera", fontTitle, 4.5f + calibrated, showCamera)) {
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Device");
                     ImGui::SameLine(spacing);
@@ -276,7 +258,7 @@ int main(int, char **) {
                 }
 
                 // Camera Parameters Card
-                if (ccalib::BeginCard("Parameters", font_title, 5.5, showParameters)) {
+                if (ccalib::BeginCard("Parameters", fontTitle, 5.5, showParameters)) {
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Resolution");
                     ImGui::SameLine(spacing);
@@ -348,7 +330,7 @@ int main(int, char **) {
                 }
 
                 // Calibration Parameters Card
-                if (ccalib::BeginCard("Calibration", font_title, 5.5, showCalibration)) {
+                if (ccalib::BeginCard("Calibration", fontTitle, 5.5, showCalibration)) {
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Rows");
                     ImGui::SameLine(spacing);
@@ -376,6 +358,7 @@ int main(int, char **) {
                     if (ImGui::IsItemClicked()) {
                         calibrationMode = !calibrationMode;
                         if (cameraOn && calibrationMode) {
+                            // Reset all parameters
                             ccalib::CalibrationParameters newCalibParams;
                             ccalib::CoverageParameters newCoverage;
                             ccalib::CheckerboardFrame newFrame;
@@ -384,7 +367,6 @@ int main(int, char **) {
                             calibParams = newCalibParams;
                             undistort = false;
                             snapID = -1;
-
                             snapshots.clear();
                             instanceErrs.clear();
                         }
@@ -421,33 +403,30 @@ int main(int, char **) {
             if (calibrationMode && ImGui::BeginTabItem("Calibration")) {
 
                 // Detect Checkerboard
-                if (cam.isStreaming()) {
-                    if (img.id != imgPrev.id) {
-                        cv::Mat gray(img.data.rows, img.data.cols, CV_8UC1);
-                        cv::cvtColor(img.data, gray, cv::COLOR_RGB2GRAY);
-                        cv::cvtColor(gray, img.data, cv::COLOR_GRAY2RGB);
+                if (cam.isStreaming() && img.id != imgPrev.id) {
+                    cv::Mat gray(img.data.rows, img.data.cols, CV_8UC1);
+                    cv::cvtColor(img.data, gray, cv::COLOR_RGB2GRAY);
+                    cv::cvtColor(gray, img.data, cv::COLOR_GRAY2RGB);
+                    cv::normalize(gray, gray, 255, 0, cv::NORM_MINMAX);
 
-                        // TODO optimize procedure, only look for checkerboard in previous area + delta
-                        // Use prior to clip to ROI
-                        cv::Rect prior = cv::Rect(0, 0, img.data.cols, img.data.rows);
-                        double priorScale = 1.0f;
-                        if (imgPrev.hasCheckerboard) {
-                            ccalib::Corners priorFrameCorners = frameCorners;
-                            ccalib::relativeToAbsPoints(priorFrameCorners.points,
-                                                        cv::Size(img.data.cols, img.data.rows));
-                            ccalib::increaseRectSize(priorFrameCorners.points, frame.size * img.data.cols * 0.2f);
-                            prior = prior & cv::boundingRect(priorFrameCorners.points);
-                            gray = gray(prior);
-                            cv::normalize(gray, gray, 255, 0, cv::NORM_MINMAX);
-                            priorScale = gray.cols / 640.0f;
-                            cv::resize(gray, gray, cv::Size(int(gray.cols / priorScale), int(gray.rows / priorScale)));
-//                            cv::imshow("Prior", gray);
-//                            cv::waitKey(1);
-                        }
+                    // Use prior to clip to ROI
+                    cv::Rect prior = cv::Rect(0, 0, img.data.cols, img.data.rows);
+                    double priorScale = 1.0f;
+                    if (imgPrev.hasCheckerboard) {
+                        ccalib::Corners priorFrameCorners = frameCorners;
+                        ccalib::relativeToAbsPoints(priorFrameCorners.points,
+                                                    cv::Size(img.data.cols, img.data.rows));
+                        ccalib::increaseRectSize(priorFrameCorners.points, frame.size * img.data.cols * 0.2f);
+                        prior = prior & cv::boundingRect(priorFrameCorners.points);
+                        gray = gray(prior);
+                        cv::normalize(gray, gray, 255, 0, cv::NORM_MINMAX);
+                        priorScale = gray.cols / 640.0f;
+                        cv::resize(gray, gray, cv::Size(int(gray.cols / priorScale), int(gray.rows / priorScale)), 0, 0,
+                                   cv::INTER_LINEAR_EXACT);
+                    }
 
-                        // Find corners
-                        img.hasCheckerboard = calib.findCorners(gray, corners);
-
+                    // Find corners
+                    if ((img.hasCheckerboard = calib.findCorners(gray, corners))) {
                         // Add prior offset
                         if (imgPrev.hasCheckerboard)
                             for (auto &p : corners) {
@@ -455,28 +434,13 @@ int main(int, char **) {
                                 p.x += prior.x;
                                 p.y += prior.y;
                             }
-
-                        if (img.hasCheckerboard) {
-                            ccalib::Corners fc(
-                                    {corners[0], corners[calib.checkerboardCols - 2], corners[corners.size() - 1],
-                                     corners[corners.size() - calib.checkerboardCols + 1]});
-                            ccalib::absToRelativePoints(fc.points, cv::Size(camParams.width, camParams.height));
-                            double width = max(cv::norm(fc.topRight() - fc.topLeft()),
-                                               cv::norm(fc.bottomRight() - fc.bottomLeft()));
-                            double height = max(cv::norm(fc.bottomLeft() - fc.topLeft()),
-                                                cv::norm(fc.bottomRight() - fc.topRight()));
-                            frame.pos = fc.topLeft() + (fc.bottomRight() - fc.topLeft()) / 2;
-                            frame.size = (float) sqrt(width * height);
-                            frame.skew = (float) log(width / height / skewRatio * camParams.ratio) / 3.0f + 0.5f;
-                            frameCorners = fc;
-                        } else
-                            frameCorners.points.clear();
+                        calib.computeFrame(corners, camParams, frame, frameCorners);
                     } else
-                        img.hasCheckerboard = imgPrev.hasCheckerboard;
+                        frameCorners.points.clear();
                 }
 
                 // Show Coverage Card
-                if (ccalib::BeginCard("Coverage", font_title, 9.5, showCoverage)) {
+                if (ccalib::BeginCard("Coverage", fontTitle, 9.5, showCoverage)) {
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Horizontal Coverage");
 
@@ -499,19 +463,29 @@ int main(int, char **) {
                 }
 
                 // Snapshots Card
-                if (ccalib::BeginCard("Snapshots", font_title, 3.3f + snapshots.size() * 0.78f, showSnapshots)) {
+                if (ccalib::BeginCard("Snapshots", fontTitle, 3.3f + snapshots.size() * 0.78f, showSnapshots)) {
                     // Collect snapshot button
-                    // TODO automatic collection of snapshots
-                    const char *status_text;
-                    if (ccalib::MaterialButton("Snapshot", !calibrated && snapshots.size() < 4) && cam.isStreaming())
+                    string statusText;
+                    if (ccalib::MaterialButton("Snapshot", !calibrated) && cam.isStreaming())
+                        takeSnapshot = true;
+
+                    // Check if view is different enough
+                    if (1.0f - frame.pos.x < coverage.x_min - snapshotDensity ||
+                        1.0f - frame.pos.x > coverage.x_max + snapshotDensity ||
+                        1.0f - frame.pos.y < coverage.y_min - snapshotDensity ||
+                        1.0f - frame.pos.y > coverage.y_max + snapshotDensity ||
+                        frame.size < coverage.size_min - snapshotDensity ||
+                        frame.size > coverage.size_max + snapshotDensity ||
+                        frame.skew < coverage.skew_min - snapshotDensity ||
+                        frame.skew > coverage.skew_max + snapshotDensity)
                         takeSnapshot = true;
 
                     if (takeSnapshot && img.hasCheckerboard)
-                        status_text = "Try not to move...";
+                        statusText = "Capturing, don't move... ";
                     else if (img.hasCheckerboard)
-                        status_text = "Ready";
+                        statusText = "Ready ";
                     else {
-                        status_text = "No Checkerboard detected!";
+                        statusText = "No Checkerboard detected! ";
                         imageMovement = 0.0f;
                     }
 
@@ -523,31 +497,38 @@ int main(int, char **) {
 
                     // If successful, add instance
                     if (takeSnapshot && imageMovement > 0.97f) {
+                        inTarget = true;
+                        frameLastAction = frameCount;
+
+                        // Save snapshot
                         ccalib::Snapshot instance;
                         instance.img.data = img.data.clone();
                         instance.img.id = img.id;
-                        instance.corners.assign(corners.begin(), corners.end());
+                        instance.corners = corners;
                         instance.frame = frame;
-                        instance.frameCorners.points.assign(frameCorners.points.begin(),
-                                                            frameCorners.points.end());
+                        instance.frameCorners = frameCorners;
                         snapshots.push_back(instance);
 
-                        // Update coverage
+                        // Update coverage & calibration
                         ccalib::updateCoverage(snapshots, coverage);
-
-                        if (snapshots.size() >= 4) {
-                            calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
-                            calibrated = calibParams.reprojErr < 0.3f;
-                            undistort = true;
-                        }
-
                         takeSnapshot = false;
-                        if (inTarget)
-                            curr_target++;
                     }
 
+                    // Update calibration parameters
+                    if (snapshots.size() >= 4 && snapshots.size() != instanceErrs.size() && !calib.isCalibrating()) {
+                        if (snapshots.size() >= 4 && !calib.isCalibrating()) {
+                            calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
+                            calibrated = calibParams.reprojErr <= 0.3f && calibParams.reprojErrVar <= 0.1f;
+                            undistort = true;
+                        }
+                    } else if (calib.isCalibrating())
+                        statusText = "Calibrating... ";
+
+                    if (takeSnapshot || calib.isCalibrating())
+                        statusText += loadingSequence[frameCount % 8 / 2];
+
                     ImGui::SameLine();
-                    ImGui::Text("%s", status_text);
+                    ImGui::Text("%s", statusText.c_str());
                     ccalib::CoveredBar(0.0f, imageMovement);
 
                     // List all snapshots
@@ -585,10 +566,6 @@ int main(int, char **) {
                                 // Update Snapshots & Coverage
                                 snapshots.erase(snapshots.begin() + i);
                                 snapID = -1;
-                                if (snapshots.size() >= 4) {
-                                    calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
-                                    calibrated = calibParams.reprojErr <= 0.3f && calibParams.reprojErrVar <= 0.1f;
-                                }
                                 ccalib::updateCoverage(snapshots, coverage);
                             }
                         }
@@ -612,27 +589,23 @@ int main(int, char **) {
 
             if (calibrated && ImGui::BeginTabItem("Results")) {
                 // Results Card
-                if (ccalib::BeginCard("Results", font_title, 7.5, showResults)) {
-//                    if (ccalib::MaterialButton("Re-Calibrate", false) || snapshots.size() != instanceErrs.size()) {
-//                        calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
-//                        calibrated = calibParams.reprojErr < 0.3f;
-//                        undistort = true;
-//                    }
-
-                    ImGui::SameLine();
+                if (ccalib::BeginCard("Results", fontTitle, 7.5, showResults)) {
                     if (ccalib::MaterialButton("Export", calibrated)) {
-                        cv::FileStorage fs("calibration.yaml", cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
-                        fs << "image_width" << camParams.width;
-                        fs << "image_height" << camParams.height;
-                        fs << "camera_name" << cameras[camID];
-                        fs << "camera_matrix" << calibParams.K;
-                        fs << "distortion_model" << "plumb_bob";
-                        fs << "distortion_coefficients" << calibParams.D;
-                        fs << "rectification_matrix" << cv::Mat::eye(3, 3, CV_64F);
+                        frameLastAction = frameCount;
+                        cv::FileStorage file("calibration.yaml", cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
+                        file << "image_width" << camParams.width;
+                        file << "image_height" << camParams.height;
+                        file << "camera_name" << cameras[camID];
+                        file << "camera_matrix" << calibParams.K;
+                        file << "distortion_model" << "plumb_bob";
+                        file << "distortion_coefficients" << calibParams.D;
+                        file << "rectification_matrix" << cv::Mat::eye(3, 3, CV_64F);
                         cv::Mat P;
                         cv::hconcat(calibParams.K, cv::Mat::zeros(3, 1, CV_64F), P);
-                        fs << "projection_matrix" << P;
-                        fs.release();
+                        file << "projection_matrix" << P;
+                        file.release();
+                    }
+                    if (frameCount - frameLastAction < 60) {
                         ImGui::SameLine();
                         ImGui::Text("Exported!");
                     }
@@ -658,14 +631,16 @@ int main(int, char **) {
                 corners = snapshots[snapID].corners;
                 frame = snapshots[snapID].frame;
                 frameCorners = snapshots[snapID].frameCorners;
+                takeSnapshot = false;
             } else if (cam.isOpened() && !cam.isStreaming()) {
                 cam.startStream();
                 img.id = cam.captureFrame(img.data);
+            } else {
+                imgPrev = img;
+                imgPrev.data = img.data.clone();
             }
         }
 
-        imgPrev = img;
-        imgPrev.data = img.data.clone();
         ImGui::End();
 
         // ==========================================
@@ -687,112 +662,89 @@ int main(int, char **) {
         cv::Mat preview = img.data.clone();
         if (cameraOn) {
             if (snapID == -1) {
-                if (undistort) {
+                if (undistort)
                     cv::undistort(img.data, preview, calibParams.K, calibParams.D);
-                }
-                if (flipImg) {
+                if (flipImg)
                     cv::flip(preview, preview, 1);
-                }
             }
             glDeleteTextures(1, &texture);
             ccalib::mat2Texture(preview, texture);
         }
 
         // Resize Camera image
-        float width_avail = ImGui::GetContentRegionAvail().x;
-        float height_avail = ImGui::GetContentRegionAvail().y;
+        float widthAvail = ImGui::GetContentRegionAvail().x;
+        float heightAvail = ImGui::GetContentRegionAvail().y;
         float scaling = 1.0f;
-        cv::Size img_size_old(preview.cols, preview.rows);
+        cv::Size imgSizeOld(preview.cols, preview.rows);
         if (!preview.empty()) {
-            if (height_avail * camParams.ratio > width_avail) {
-                scaling = width_avail / preview.cols;
-                cv::resize(preview, preview, cv::Size((int) width_avail, (int) (width_avail / camParams.ratio)));
+            if (heightAvail * camParams.ratio > widthAvail) {
+                scaling = widthAvail / preview.cols;
+                cv::resize(preview, preview, cv::Size((int) widthAvail, (int) (widthAvail / camParams.ratio)));
             } else {
-                scaling = height_avail / preview.rows;
+                scaling = heightAvail / preview.rows;
                 cv::resize(preview, preview,
-                           cv::Size((int) (height_avail * camParams.ratio), (int) height_avail));
+                           cv::Size((int) (heightAvail * camParams.ratio), (int) heightAvail));
             }
         }
 
         // Positioning && Centering
-        ImVec2 pos = ImVec2((width_avail - preview.cols) / 2 + ImGui::GetCursorPosX(),
-                            (height_avail - preview.rows) / 2 + ImGui::GetCursorPosY());
+        ImVec2 pos = ImVec2((widthAvail - preview.cols) / 2 + ImGui::GetCursorPosX(),
+                            (heightAvail - preview.rows) / 2 + ImGui::GetCursorPosY());
         ImGui::SetCursorPos(pos);
         ImGui::Image((void *) (intptr_t) texture, ImVec2(preview.cols, preview.rows));
         cv::Point2f offset(pos.x + widthParameterWindow, pos.y);
 
-        // Draw Corners
-        if (calibrationMode && !corners.empty()) {
-            vector <cv::Point2f> drawCorners(corners);
+        // Draw Corners & Frame
+        if (calibrationMode && !frameCorners.points.empty()) {
+            ccalib::Corners drawFrameCorners = frameCorners;
+            vector<cv::Point2f> drawCorners(corners);
+            ccalib::relativeToAbsPoints(drawFrameCorners.points, imgSizeOld);
+            ccalib::increaseRectSize(drawFrameCorners.points, frame.size * img.data.cols * 0.1f);
             if (flipImg && snapID == -1) {
-                ccalib::flipPoints(drawCorners, img_size_old);
+                ccalib::flipPoints(drawCorners, imgSizeOld);
+                ccalib::flipPoints(drawFrameCorners.points, imgSizeOld);
             }
+
+            // Convert to img coordinates
             for (auto &p : drawCorners) {
                 p *= scaling;
                 p += offset;
             }
-            ccalib::drawPoints(drawCorners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), frame.size * 4.0f);
-        }
-
-        // Draw Frame around checkerboard
-        ccalib::Corners drawFrameCorners = frameCorners;
-        if (calibrationMode && !corners.empty() && !drawFrameCorners.points.empty()) {
-            ccalib::relativeToAbsPoints(drawFrameCorners.points, img_size_old);
-            ccalib::increaseRectSize(drawFrameCorners.points, frame.size * 64);
-            if (flipImg && snapID == -1) {
-                ccalib::flipPoints(drawFrameCorners.points, img_size_old);
-            }
-
-            // Convert to img coordinates
             for (auto &p : drawFrameCorners.points) {
                 p *= scaling;
                 p += offset;
             }
-            if (curr_target >= target_frames.size())
+
+            // Draw
+            ccalib::drawPoints(drawCorners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), frame.size * 4.0f);
+            if (inTarget) {
+                ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.13f, 0.83f, 0.91f, 1.00f), 16.0f, false);
+                if (frameCount - frameLastAction > 10)
+                    inTarget = false;
+            } else if (takeSnapshot)
+                ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.91f, 0.83f, 0.26f, 1.00f), 8.0f, true);
+            else
                 ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
         }
 
-        // Draw target frames
-        if (calibrationMode && curr_target < target_frames.size()) {
-            // Convert and flip points
-            vector <cv::Point2f> target_corners(target_frames[curr_target]);
-            if (flipImg && snapID == -1) {
-                ccalib::flipPoints(target_corners, cv::Size(1, 1));
-            }
-
-            float checkerboardRatio = (float) calib.checkerboardCols / (float) calib.checkerboardRows;
-            float ratioOffset = (preview.rows * camParams.ratio - preview.rows * checkerboardRatio) / 2.0f;
-            for (int i = 0; i < drawFrameCorners.points.size(); i++) {
-                target_corners[i].x =
-                        target_corners[i].x * preview.rows * checkerboardRatio + ratioOffset + offset.x;
-                target_corners[i].y = target_corners[i].y * preview.rows + offset.y;
-            }
-
-            if (!corners.empty() && !drawFrameCorners.points.empty() && snapID == -1) {
-                double dist = cv::norm((target_corners[0] + (target_corners[2] - target_corners[0]) / 2) -
-                                       (drawFrameCorners.topLeft() +
-                                        (drawFrameCorners.bottomRight() - drawFrameCorners.topLeft()) / 2));
-                double frameArea = cv::contourArea(drawFrameCorners.points);
-                double targetArea = cv::contourArea(target_corners);
-
-                ImVec4 col_bg = ccalib::interp_color((float) dist, 0, preview.rows / 2.0f);
-
-                if (dist <= frame.size * 64 * scaling && frameArea > targetArea * 0.8f &&
-                    frameArea < targetArea * 1.2f) {
-                    if (!takeSnapshot) {
-                        takeSnapshot = true;
-                    }
-                    inTarget = true;
-                    ccalib::drawRectangle(target_corners, ImVec4(0.13f, 0.83f, 0.91f, 1.00f), 24.0f, true);
-                } else {
-                    takeSnapshot = false;
-                    inTarget = false;
-                    ccalib::drawRectangle(target_corners, col_bg, 12.0f, true);
+        // Draw previous recorded snapshots
+        if (!snapshots.empty()) {
+            int n = snapshots.size() - 1;
+            for (int i = n; i > 0; i--) {
+                ccalib::Corners drawFrameCorners = snapshots[i].frameCorners;
+                ccalib::relativeToAbsPoints(drawFrameCorners.points, imgSizeOld);
+                ccalib::increaseRectSize(drawFrameCorners.points, snapshots[i].frame.size * img.data.cols * 0.1f);
+                if (flipImg) {
+                    ccalib::flipPoints(drawFrameCorners.points, imgSizeOld);
                 }
 
-                double area_diff = abs(1.0f - (float) frameArea / (float) targetArea);
-                col_bg = ccalib::interp_color((float) area_diff, 0, 1.0f);
-                ccalib::drawRectangle(drawFrameCorners.points, col_bg, 4.0f, true);
+                // Convert to img coordinates
+                for (auto &p : drawFrameCorners.points) {
+                    p *= scaling;
+                    p += offset;
+                }
+                ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.56f, 0.83f, 0.26f, float(i) / n * 0.5f), 4.0f,
+                                      false);
             }
         }
 
@@ -819,6 +771,7 @@ int main(int, char **) {
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
+        frameCount++;
     }
 
     // Cleanup ImGui

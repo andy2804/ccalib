@@ -12,6 +12,8 @@
 namespace ccalib {
 
     class Calibrator {
+    private:
+        bool busy = false;
 
     public:
 
@@ -25,6 +27,8 @@ namespace ccalib {
 
         ~Calibrator();
 
+        bool isCalibrating();
+
         bool findCorners(cv::Mat &img, std::vector<cv::Point2f> &corners);
 
         double computeReprojectionErrors(const std::vector<std::vector<cv::Point3f>> &objectPoints,
@@ -37,6 +41,8 @@ namespace ccalib {
 
         double stddev(std::vector<double> const & func);
 
+        void computeFrame(const std::vector<cv::Point2f> &corners, const CameraParameters &camParams, CheckerboardFrame &frame,
+                      Corners &frameCorners);
     };
 
 } // namespace ccalib
