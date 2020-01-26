@@ -7,9 +7,10 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui_internal.h"
 #include "camera.h"
+#include "calibrator.h"
 #include "functions.h"
 #include "imgui_extensions.h"
-#include "calibrator.h"
+#include "imgui_widgets.h"
 
 #include <SDL.h>
 #include <experimental/filesystem>
@@ -81,7 +82,7 @@ int main(int, char **) {
     state.fontTitle = fontTitle;
     state.widthParameterWindow = 350;
     state.widthItemSpacing = (state.widthParameterWindow - ImGui::GetStyle().WindowPadding.x * 2) / 2;
-    state.camFPS = 4;
+    state.fpsID = 4;
 
     // UI specific variables
     int frameCount = 0;
@@ -206,129 +207,129 @@ int main(int, char **) {
 
             if (ImGui::BeginTabItem("Parameters")) {
                 // Camera Card
-                if (ccalib::BeginCard("Camera", fontTitle, 4.5f + calibrated, showCamera)) {
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Device");
-                    ImGui::SameLine(spacing);
-
-                    if (ImGui::BeginCombo("##camera_selector", cameras[camID].c_str(), 0)) {
-                        for (int i = 0; i < cameras.size(); i++) {
-                            bool is_selected = (cameras[camID] == cameras[i]);
-                            if (ImGui::Selectable(cameras[i].c_str(), is_selected)) {
-                                if (cameraOn) {
-                                    cam.stopStream();
-                                    cam.close();
-                                    cameraOn = false;
-                                }
-                                camID = i;
-                            }
-                            if (is_selected) {
-                                ImGui::SetItemDefaultFocus();
-                            }   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
-                        }
-                        ImGui::EndCombo();
-                    }
-
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Stream");
-                    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
-                    ccalib::ToggleButton("##cam_toggle", &cameraOn, !cameraOn);
-                    if (cameraOn && ImGui::IsItemClicked(0)) {
-                        cam.open();
-                        cam.updateParameters(camParams);
-                        cam.startStream();
-                        camParamsChanged = true;
-                    } else if (!cameraOn & ImGui::IsItemClicked(0)) {
-                        cam.stopStream();
-                        cam.close();
-                    }
-
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Flip Image");
-                    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
-                    ccalib::ToggleButton("##flip_toggle", &flipImg);
-
-                    if (calibrated) {
-                        ImGui::AlignTextToFramePadding();
-                        ImGui::Text("Undistort Image");
-                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
-                        ccalib::ToggleButton("##undistort_toggle", &undistort);
-                    }
-
-                    ccalib::EndCard();
-                }
+                ccalib::CameraCard(state, cam, camParams);
+//                if (ccalib::BeginCard("Camera", fontTitle, 4.5f + calibrated, showCamera)) {
+//                    ImGui::AlignTextToFramePadding();
+//                    ImGui::Text("Device");
+//                    ImGui::SameLine(spacing);
+//
+//                    if (ImGui::BeginCombo("##camera_selector", cameras[camID].c_str(), 0)) {
+//                        for (int i = 0; i < cameras.size(); i++) {
+//                            bool is_selected = (cameras[camID] == cameras[i]);
+//                            if (ImGui::Selectable(cameras[i].c_str(), is_selected)) {
+//                                if (cameraOn) {
+//                                    cam.stopStream();
+//                                    cam.close();
+//                                    cameraOn = false;
+//                                }
+//                                camID = i;
+//                            }
+//                            if (is_selected) {
+//                                ImGui::SetItemDefaultFocus();
+//                            }   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+//                        }
+//                        ImGui::EndCombo();
+//                    }
+//
+//                    ImGui::AlignTextToFramePadding();
+//                    ImGui::Text("Stream");
+//                    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
+//                    ccalib::ToggleButton("##cam_toggle", &cameraOn, !cameraOn);
+//                    if (cameraOn && ImGui::IsItemClicked(0)) {
+//                        cam.open();
+//                        cam.updateParameters(camParams);
+//                        cam.startStream();
+//                        camParamsChanged = true;
+//                    } else if (!cameraOn & ImGui::IsItemClicked(0)) {
+//                        cam.stopStream();
+//                        cam.close();
+//                    }
+//
+//                    ImGui::AlignTextToFramePadding();
+//                    ImGui::Text("Flip Image");
+//                    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
+//                    ccalib::ToggleButton("##flip_toggle", &flipImg);
+//
+//                    if (calibrated) {
+//                        ImGui::AlignTextToFramePadding();
+//                        ImGui::Text("Undistort Image");
+//                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
+//                        ccalib::ToggleButton("##undistort_toggle", &undistort);
+//                    }
+//
+//                    ccalib::EndCard();
+//                }
 
                 // Camera Parameters Card
-                if (ccalib::BeginCard("Parameters", fontTitle, 5.5, showParameters)) {
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Resolution");
-                    ImGui::SameLine(spacing);
-                    ImGui::PushItemWidth(44);
-                    ImGui::InputInt("##width", &camParams.width, 0);
-                    ImGui::SameLine();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("x");
-                    ImGui::SameLine();
-                    ImGui::InputInt("##height", &camParams.height, 0);
-                    ImGui::PopItemWidth();
-                    const char *button_text = "Set";
-                    ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
-                                    style.FramePadding.x);
-                    if (ccalib::MaterialButton(button_text)) {
-                        cam.updateResolution(camParams.width, camParams.height);
-                        camParamsChanged = true;
-                    }
-
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Framerate");
-                    ImGui::SameLine(spacing);
-                    if (ImGui::BeginCombo("##camera_fps", to_string(camera_fps[camFPS]).c_str(), 0)) {
-                        for (int i = 0; i < camera_fps.size(); i++) {
-                            bool is_selected = (camera_fps[camFPS] == camera_fps[i]);
-                            if (ImGui::Selectable(to_string(camera_fps[i]).c_str(), is_selected)) {
-                                camFPS = i;
-                                if (!ImGui::IsMouseClicked(0)) {
-                                    camParams.fps = (int) camera_fps[camFPS];
-                                    cam.updateFramerate(camParams.fps);
-                                }
-                            }
-                            if (is_selected)
-                                ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
-                        }
-                        ImGui::EndCombo();
-                        camParamsChanged = true;
-                    }
-
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Exposure Time");
-                    ImGui::SameLine(spacing);
-                    if (ImGui::SliderFloat("##camera_exptime", &camParams.exposure, 0, 1, "%.3f", 2.0)) {
-                        cam.updateExposure(camParams.exposure);
-                    }
-
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Select Format");
-                    ImGui::SameLine(spacing);
-                    if (ImGui::BeginCombo("##camera_fmt", camera_fmt[camFMT].c_str(), 0)) {
-                        for (int i = 0; i < camera_fmt.size(); i++) {
-                            bool is_selected = (camera_fmt[camFMT] == camera_fmt[i]);
-                            if (ImGui::Selectable(camera_fmt[i].c_str(), is_selected)) {
-                                camFMT = i;
-                                if (!ImGui::IsMouseClicked(0)) {
-                                    camParams.format = camera_fmt[camFMT];
-                                    cam.updateFormat(camParams.format);
-                                }
-                            }
-                            if (is_selected)
-                                ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
-                        }
-                        ImGui::EndCombo();
-                        camParamsChanged = true;
-                    }
-
-
-                    ccalib::EndCard();
-                }
+                ccalib::CameraParametersCard(state, cam, camParams);
+//                if (ccalib::BeginCard("Parameters", fontTitle, 5.5, showParameters)) {
+//                    ImGui::AlignTextToFramePadding();
+//                    ImGui::Text("Resolution");
+//                    ImGui::SameLine(spacing);
+//                    ImGui::PushItemWidth(44);
+//                    ImGui::InputInt("##width", &camParams.width, 0);
+//                    ImGui::SameLine();
+//                    ImGui::AlignTextToFramePadding();
+//                    ImGui::Text("x");
+//                    ImGui::SameLine();
+//                    ImGui::InputInt("##height", &camParams.height, 0);
+//                    ImGui::PopItemWidth();
+//                    const char *button_text = "Set";
+//                    ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
+//                                    style.FramePadding.x);
+//                    if (ccalib::MaterialButton(button_text)) {
+//                        cam.updateResolution(camParams.width, camParams.height);
+//                        camParamsChanged = true;
+//                    }
+//
+//                    ImGui::AlignTextToFramePadding();
+//                    ImGui::Text("Framerate");
+//                    ImGui::SameLine(spacing);
+//                    if (ImGui::BeginCombo("##camera_fps", to_string(camera_fps[camFPS]).c_str(), 0)) {
+//                        for (int i = 0; i < camera_fps.size(); i++) {
+//                            bool is_selected = (camera_fps[camFPS] == camera_fps[i]);
+//                            if (ImGui::Selectable(to_string(camera_fps[i]).c_str(), is_selected)) {
+//                                camFPS = i;
+//                                if (!ImGui::IsMouseClicked(0)) {
+//                                    camParams.fps = (int) camera_fps[camFPS];
+//                                    cam.updateFramerate(camParams.fps);
+//                                }
+//                            }
+//                            if (is_selected)
+//                                ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+//                        }
+//                        ImGui::EndCombo();
+//                        camParamsChanged = true;
+//                    }
+//
+//                    ImGui::AlignTextToFramePadding();
+//                    ImGui::Text("Exposure Time");
+//                    ImGui::SameLine(spacing);
+//                    if (ImGui::SliderFloat("##camera_exptime", &camParams.exposure, 0, 1, "%.3f", 2.0)) {
+//                        cam.updateExposure(camParams.exposure);
+//                    }
+//
+//                    ImGui::AlignTextToFramePadding();
+//                    ImGui::Text("Select Format");
+//                    ImGui::SameLine(spacing);
+//                    if (ImGui::BeginCombo("##camera_fmt", camera_fmt[camFMT].c_str(), 0)) {
+//                        for (int i = 0; i < camera_fmt.size(); i++) {
+//                            bool is_selected = (camera_fmt[camFMT] == camera_fmt[i]);
+//                            if (ImGui::Selectable(camera_fmt[i].c_str(), is_selected)) {
+//                                camFMT = i;
+//                                if (!ImGui::IsMouseClicked(0)) {
+//                                    camParams.format = camera_fmt[camFMT];
+//                                    cam.updateFormat(camParams.format);
+//                                }
+//                            }
+//                            if (is_selected)
+//                                ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+//                        }
+//                        ImGui::EndCombo();
+//                        camParamsChanged = true;
+//                    }
+//                    ccalib::EndCard();
+//                }
 
                 // Calibration Parameters Card
                 if (ccalib::BeginCard("Calibration", fontTitle, 5.5, showCalibration)) {
@@ -426,8 +427,10 @@ int main(int, char **) {
                         gray = gray(prior);
                         cv::normalize(gray, gray, 255, 0, cv::NORM_MINMAX);
                         priorScale = min(1.0f, gray.cols / 480.0f);
+                        float previousWidth = gray.cols;
                         cv::resize(gray, gray, cv::Size(int(gray.cols / priorScale), int(gray.rows / priorScale)), 0, 0,
                                    cv::INTER_LINEAR_EXACT);
+                        priorScale = previousWidth / gray.cols;
                     }
 
                     // Find corners
@@ -475,6 +478,7 @@ int main(int, char **) {
                         takeSnapshot = true;
 
                     // Check if view is different enough
+                    // TODO only check if started snapshotting (init pos)
                     if (1.0f - frame.pos.x < coverage.x_min - snapshotDensity ||
                         1.0f - frame.pos.x > coverage.x_max + snapshotDensity ||
                         1.0f - frame.pos.y < coverage.y_min - snapshotDensity ||
@@ -636,6 +640,7 @@ int main(int, char **) {
                 corners = snapshots[snapID].corners;
                 frame = snapshots[snapID].frame;
                 frameCorners = snapshots[snapID].frameCorners;
+                frameChanged = true;
                 takeSnapshot = false;
             } else if (cam.isOpened() && !cam.isStreaming()) {
                 cam.startStream();

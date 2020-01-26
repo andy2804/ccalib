@@ -93,10 +93,10 @@ namespace ccalib {
 
         // Camera specific state variables
         int camID = 0;
-        int camFPS = 0;
-        int camFMT = 0;
-        std::vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
-        std::vector<std::string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
+        int fpsID = 0;
+        int fmtID = 0;
+        std::vector<int> cameraFPS{5, 10, 15, 20, 30, 50, 60, 100, 120};
+        std::vector<std::string> cameraFMTS{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
         std::vector<std::string> cameras;
     };
 
