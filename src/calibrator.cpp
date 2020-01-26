@@ -10,6 +10,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <thread>
+#include <numeric>
 
 
 using namespace std;
@@ -23,6 +24,15 @@ namespace ccalib {
                                                              checkerboardSize(size) {}
 
     Calibrator::~Calibrator() {}
+
+    double Calibrator::stddev(std::vector<double> const & func)
+    {
+        double mean = std::accumulate(func.begin(), func.end(), 0.0) / func.size();
+        double sq_sum = std::inner_product(func.begin(), func.end(), func.begin(), 0.0,
+                                           [](double const & x, double const & y) { return x + y; },
+                                           [mean](double const & x, double const & y) { return (x - mean)*(y - mean); });
+        return std::sqrt(sq_sum / ( func.size() - 1 ));
+    }
 
     bool Calibrator::findCorners(cv::Mat &img, std::vector<cv::Point2f> &corners) {
         bool found = false;
@@ -43,7 +53,7 @@ namespace ccalib {
     double Calibrator::computeReprojectionErrors(const std::vector<std::vector<cv::Point3f> > &objectPoints,
                                                  const std::vector<std::vector<cv::Point2f> > &imagePoints,
                                                  const ccalib::CalibrationParameters &params,
-                                                 std::vector<float> &perViewErrors) {
+                                                 std::vector<double> &perViewErrors) {
         std::vector<cv::Point2f> imagePoints2;
         int i, totalPoints = 0;
         double totalErr = 0, err;
@@ -54,7 +64,7 @@ namespace ccalib {
             err = norm(cv::Mat(imagePoints[i]), cv::Mat(imagePoints2), CV_L2); // difference
 
             auto n = (int) objectPoints[i].size();
-            perViewErrors[i] = (float) std::sqrt(err * err / n); // save for this view
+            perViewErrors[i] = std::sqrt(err * err / n); // save for this view
             totalErr += err * err; // sum it up
             totalPoints += n;
         }
@@ -63,13 +73,13 @@ namespace ccalib {
     }
 
     void Calibrator::calibrateCameraBG(const std::vector<ccalib::Snapshot> &instances, ccalib::CalibrationParameters &params,
-                                       std::vector<float> &errs) {
+                                       std::vector<double> &errs) {
         std::thread t(&Calibrator::calibrateCamera, this, std::ref(instances), std::ref(params), std::ref(errs));
         t.detach();
     }
 
     bool Calibrator::calibrateCamera(const std::vector<ccalib::Snapshot> &instances, ccalib::CalibrationParameters &params,
-                                     std::vector<float> &errs) {
+                                     std::vector<double> &errs) {
         // Initialize values
         std::vector<cv::Point3f> corners3d;
         for (int i = 0; i < checkerboardRows - 1; ++i)
@@ -91,6 +101,7 @@ namespace ccalib {
                             CV_CALIB_FIX_ASPECT_RATIO | CV_CALIB_FIX_K4 | CV_CALIB_FIX_K5);
 
         params.reprojErr = computeReprojectionErrors(objPoints, imgPoints, params, errs);
+//        cout << stddev(errs) << endl;
         return params.reprojErr <= 0.3f;
     }
 

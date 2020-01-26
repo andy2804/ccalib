@@ -121,7 +121,7 @@ int main(int, char **) {
     ccalib::CalibrationParameters calibParams;
     vector<ccalib::Snapshot> snapshots;
     vector<cv::Point2f> corners;
-    vector<float> instance_errs;
+    vector<double> instanceErrs;
     float skewRatio = ((calib.checkerboardCols - 1.0f) / (calib.checkerboardRows - 1.0f));
     float imageMovement = 0.0f;
     int snapID = -1;
@@ -395,7 +395,7 @@ int main(int, char **) {
                             snapID = -1;
 
                             snapshots.clear();
-                            instance_errs.clear();
+                            instanceErrs.clear();
                         }
                     }
 
@@ -521,7 +521,7 @@ int main(int, char **) {
                         ccalib::updateCoverage(snapshots, coverage);
 
                         if (snapshots.size() >= 4) {
-                            calib.calibrateCameraBG(snapshots, calibParams, instance_errs);
+                            calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
                             calibrated = calibParams.reprojErr < 0.3f;
                             undistort = true;
                         }
@@ -553,10 +553,10 @@ int main(int, char **) {
                             bool deleteAdvice = false;
 
                             // Check specific reprojection error
-                            if (instance_errs.size() > i) {
-                                toolTip = "Error: " + to_string(instance_errs[i]);
-                                color = ccalib::interp_color(instance_errs[i], 0.0f, 1.0f);
-                                deleteAdvice = instance_errs[i] > 0.5;
+                            if (instanceErrs.size() > i) {
+                                toolTip = "Error: " + to_string(instanceErrs[i]);
+                                color = ccalib::interp_color(instanceErrs[i], 0.0f, 1.0f);
+                                deleteAdvice = instanceErrs[i] > 0.5;
                             } else
                                 color = ImVec4(0.56f, 0.83f, 0.26f, 1.0f);
 
@@ -571,7 +571,7 @@ int main(int, char **) {
                                 snapshots.erase(snapshots.begin() + i);
                                 snapID = -1;
                                 if (snapshots.size() >= 4) {
-                                    calib.calibrateCameraBG(snapshots, calibParams, instance_errs);
+                                    calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
                                     calibrated = calibParams.reprojErr < 0.3f;
                                 }
                                 ccalib::updateCoverage(snapshots, coverage);
@@ -601,8 +601,8 @@ int main(int, char **) {
                     if (ccalib::BeginCard("Results", font_title, 7.5,
                                           showResults)) {
                         if (ccalib::MaterialButton("Re-Calibrate", false) ||
-                            snapshots.size() != instance_errs.size()) {
-                            calib.calibrateCameraBG(snapshots, calibParams, instance_errs);
+                            snapshots.size() != instanceErrs.size()) {
+                            calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
                             calibrated = calibParams.reprojErr < 0.3f;
                             undistort = true;
                         }
@@ -793,7 +793,7 @@ int main(int, char **) {
             if (snapID == -1)
                 reproj_error = "Mean Reprojection Error: " + to_string(calibParams.reprojErr);
             else
-                reproj_error = "Reprojection Error: " + to_string(instance_errs[snapID]);
+                reproj_error = "Reprojection Error: " + to_string(instanceErrs[snapID]);
             float text_width = ImGui::CalcTextSize(reproj_error.c_str()).x;
             ImGui::SetCursorPos(ImVec2(pos.x + preview.cols - text_width - 16, pos.y + 17));
             ImGui::TextColored(ImColor(0, 0, 0, 255), "%s", reproj_error.c_str());

@@ -29,11 +29,13 @@ namespace ccalib {
 
         double computeReprojectionErrors(const std::vector<std::vector<cv::Point3f>> &objectPoints,
                                      const std::vector<std::vector<cv::Point2f>> &imagePoints,
-                                     const CalibrationParameters &params, std::vector<float> &perViewErrors);
+                                     const CalibrationParameters &params, std::vector<double> &perViewErrors);
 
-        bool calibrateCamera(const std::vector<Snapshot> &instances, CalibrationParameters &params, std::vector<float> &errs);
+        bool calibrateCamera(const std::vector<Snapshot> &instances, CalibrationParameters &params, std::vector<double> &errs);
 
-        void calibrateCameraBG(const std::vector<Snapshot> &instances, CalibrationParameters &params, std::vector<float> &errs);
+        void calibrateCameraBG(const std::vector<Snapshot> &instances, CalibrationParameters &params, std::vector<double> &errs);
+
+        double stddev(const std::vector<double> &func);
     };
 
 } // namespace ccalib
