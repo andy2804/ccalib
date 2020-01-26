@@ -172,21 +172,22 @@ namespace ccalib {
 
 
         // Draw button
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.56f, 0.83f, 0.26f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.48f, 0.75f, 0.18f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.56f, 0.83f, 0.26f, 0.8f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.56f, 0.83f, 0.26f, 0.6f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.56f, 0.83f, 0.26f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
         bool clicked = ImGui::Button(label, size);
         float height = ImGui::GetItemRectSize().y;
         float width = ImGui::GetItemRectSize().x;
 
-        ImGui::PopStyleColor(3);
+        ImGui::PopStyleColor(4);
 
         // Draw rectangle if focused
         if (focus) {
             ImU32 col_bg;
             ImGuiContext &g = *GImGui;
-            float padding = 1.0f;
+            float padding = 1.5f;
             float ANIM_SPEED = 0.32f;
             float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
             col_bg = ImGui::GetColorU32(
@@ -198,6 +199,88 @@ namespace ccalib {
                                ImDrawCornerFlags_All, padding * 2);
         }
 
+        return clicked;
+    }
+
+    bool MaterialCancelButton(const char *label, bool focus, const ImVec2 &size) {
+        // Get Position and Drawlist
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        ImDrawList *draw_list = ImGui::GetWindowDrawList();
+
+
+        // Draw button
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.83f, 0.26f, 0.26f, 0.8f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.83f, 0.26f, 0.26f, 0.6f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.83f, 0.26f, 0.26f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+        bool clicked = ImGui::Button(label, size);
+        float height = ImGui::GetItemRectSize().y;
+        float width = ImGui::GetItemRectSize().x;
+
+        ImGui::PopStyleColor(4);
+
+        // Draw rectangle if focused
+        if (focus) {
+            ImU32 col_bg;
+            ImGuiContext &g = *GImGui;
+            float padding = 1.0f;
+            float ANIM_SPEED = 0.32f;
+            float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
+            col_bg = ImGui::GetColorU32(
+                    ImLerp(ImVec4(0.83f, 0.26f, 0.26f, 1.0f), ImVec4(0.91f, 0.42f, 0.42f, 1.0f), t_anim));
+
+            draw_list->AddRect(ImVec2(p.x - padding, p.y - padding),
+                               ImVec2(p.x + width + padding, p.y + height + padding), col_bg,
+                               ImGui::GetStyle().FrameRounding,
+                               ImDrawCornerFlags_All, padding * 2);
+        }
+
+        return clicked;
+    }
+
+    bool Hoverable(const std::string &text, const std::string &toolTip, const ImVec4 &color, const ImVec2 &size) {
+        ImDrawList *drawList = ImGui::GetWindowDrawList();
+        ImGuiStyle style = ImGui::GetStyle();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4);
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        ImVec2 t = ImGui::GetCursorPos();
+        ImGui::SetCursorPosY(t.y - 4);
+        ImGui::InvisibleButton(text.c_str(), ImVec2(size.x, size.y + 8));
+
+        // Draw Text & Background
+        bool isHovered = false;
+        if (ImGui::IsItemHovered()) {
+            isHovered = true;
+            if (!toolTip.empty()) {
+                ImGui::BeginTooltip();
+                ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+                ImGui::TextUnformatted(toolTip.c_str());
+                ImGui::PopTextWrapPos();
+                ImGui::EndTooltip();
+            }
+            drawList->AddRect(ImVec2(p.x - 5, p.y - 4), ImVec2(p.x + size.x + 5, p.y + size.y),
+                              ImGui::GetColorU32(color), 3.0f, ImDrawCornerFlags_All, 2.0f);
+        } else {
+            drawList->AddRectFilled(ImVec2(p.x - 4, p.y - 4), ImVec2(p.x + size.x + 4, p.y + size.y),
+                                    ImGui::GetColorU32(ImVec4(color.x, color.y, color.z, 0.5f)),
+                                    3.0f);
+        }
+
+        ImGui::SetCursorPos(t);
+//        drawList->AddText(ImVec2(p.x + 8, p.y + 8), ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
+        ImGui::Text("%s", text.c_str());
+        ImGui::SetCursorPos(ImVec2(t.x, t.y - 4));
+        ImGui::InvisibleButton(text.c_str(), ImVec2(size.x, size.y));
+        return isHovered;
+    }
+
+    bool HoverableDeleteButton(const std::string &id, const ImVec2 &size, const bool &focus) {
+        std::string cancelID = "x##" + id;
+        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.33f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+        bool clicked = ccalib::MaterialCancelButton(cancelID.c_str(), focus, size);
+        ImGui::PopStyleVar(2);
         return clicked;
     }
 

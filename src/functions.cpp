@@ -2,6 +2,7 @@
 // Created by andya on 23.01.20.
 //
 
+#include <opencv2/opencv.hpp>
 #include "structures.h"
 #include "functions.h"
 
@@ -31,6 +32,28 @@ namespace ccalib {
                          GL_UNSIGNED_BYTE,    // Image data type
                          image.ptr());        // The actual image data itself
         }
+    }
+
+    float computeImageDiff(const cv::Mat &img1, const cv::Mat &img2, cv::Rect &rect) {
+        // Assert same dimensionality of images to compare
+        assert(img1.size == img2.size && "Images need to have the same dimensions!");
+
+        // Ensure ROI is inside image boundaries
+        rect = rect & cv::Rect(0, 0, img1.cols, img1.rows);
+
+        // Variables to hold clipped images
+        cv::Mat oldImg = img1(rect);
+        cv::Mat newImg = img2(rect);
+
+        // Do comparison
+        cv::cvtColor(oldImg, oldImg, cv::COLOR_RGB2GRAY);
+        cv::cvtColor(newImg, newImg, cv::COLOR_RGB2GRAY);
+        cv::normalize(oldImg, oldImg, 255, 0, cv::NORM_MINMAX);
+        cv::normalize(newImg, newImg, 255, 0, cv::NORM_MINMAX);
+        cv::Mat diff(oldImg.rows, oldImg.cols, CV_8UC1);
+        cv::absdiff(oldImg, newImg, diff);
+        cv::Scalar mean_diff = cv::mean(diff);
+        return 1.0f - (float) mean_diff.val[0] / 255.0f;
     }
 
     void flipPoints(std::vector<cv::Point2f> &points, const cv::Size &imgSize, const int &direction) {

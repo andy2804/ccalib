@@ -12,6 +12,8 @@ namespace ccalib {
 
     void mat2Texture(cv::Mat &image, GLuint &imageTexture);
 
+    float computeImageDiff(const cv::Mat &img1, const cv::Mat &img2, cv::Rect &rect);
+
     void flipPoints(std::vector<cv::Point2f> &points, const cv::Size &imgSize, const int &direction = 0);
 
     void increaseRectSize(std::vector<cv::Point2f> &corners, const float &padding);

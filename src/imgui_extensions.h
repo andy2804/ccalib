@@ -19,6 +19,12 @@ namespace ccalib {
 
     bool MaterialButton(const char *label, bool focus = false, const ImVec2 &size = ImVec2(0, 0));
 
+    bool MaterialCancelButton(const char *label, bool focus, const ImVec2 &size = ImVec2(0, 0));
+
+    bool Hoverable(const std::string &text, const std::string &toolTip, const ImVec4 &color, const ImVec2 &size);
+
+    bool HoverableDeleteButton(const std::string &id, const ImVec2 &size, const bool &focus = false);
+
     bool BeginCard(const char *label, ImFont *title_font, const float &item_height, bool &visible);
 
     void EndCard();
