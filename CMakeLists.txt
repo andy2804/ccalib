@@ -43,6 +43,8 @@ set(sources
         src/functions.h
         src/imgui_extensions.cpp
         src/imgui_extensions.h
+        src/imgui_widgets.cpp
+        src/imgui_widgets.h
     )
 
 add_executable(ccalib src/main.cpp ${sources})

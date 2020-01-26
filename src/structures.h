@@ -6,6 +6,7 @@
 #define STRUCTURES_H
 
 #include <opencv2/core/mat.hpp>
+#include <imgui/imgui.h>
 
 namespace ccalib {
 
@@ -63,33 +64,39 @@ namespace ccalib {
 
     struct GUIStateVariables {
         // Switches
-        bool show_demo_window = false;
-        bool show_camera_card = true;
-        bool show_parameters_card = false;
-        bool show_calibration_card = true;
-        bool show_coverage_card = false;
-        bool show_snapshots_card = true;
-        bool show_result_card = true;
-        bool calibration_mode = false;
-        bool cameraOn = false;
+        bool showCamera = true;
+        bool showParameters = false;
+        bool showCalibration = false;
+        bool showCoverage = true;
+        bool showSnapshots = true;
+        bool showResults = true;
+        bool calibrationMode = false;
         bool changed = false;
-        bool flip_img = false;
+        bool cameraOn = false;
+        bool flipImg = false;
         bool undistort = false;
         bool calibrated = false;
-        bool taking_snapshot = false;
-        bool in_target = false;
-
-        // Current list values
-        int currCamera = 0;
-        int currTarget = 0;
-
-        // Calibration state Variables
-        int chkbrd_rows = 8;
-        int chkbrd_cols = 11;
-        float chkbrd_size = 0.022;      // in [m]
+        bool takeSnapshot = false;
+        bool inTarget = false;
 
         // UI state variables
-        int width_parameter_window = 350;
+        ImFont *fontTitle;
+        int widthParameterWindow = 350;
+        float widthItemSpacing = 180;
+        int frameLastAction = 0;
+        int frameCount = 0;
+        float imageMovement = 0.0f;
+        int snapID = -1;
+        float snapshotDensity = 0.06f;
+        std::string loadingSequence = "/-\\|";
+
+        // Camera specific state variables
+        int camID = 0;
+        int camFPS = 0;
+        int camFMT = 0;
+        std::vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
+        std::vector<std::string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
+        std::vector<std::string> cameras;
     };
 
     struct CalibrationParameters {
