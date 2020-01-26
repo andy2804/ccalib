@@ -98,6 +98,7 @@ namespace ccalib {
         cv::Mat P = cv::Mat::zeros(3, 4, CV_64F);
         std::vector<cv::Mat> R, T;
         double reprojErr = DBL_MAX;
+        double reprojErrVar = DBL_MAX;
     };
 
 } // namespace ccalib

@@ -3,6 +3,7 @@
 //
 
 #include <opencv2/opencv.hpp>
+#include <numeric>
 #include "structures.h"
 #include "functions.h"
 

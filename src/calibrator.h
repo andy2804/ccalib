@@ -35,7 +35,8 @@ namespace ccalib {
 
         void calibrateCameraBG(const std::vector<Snapshot> &instances, CalibrationParameters &params, std::vector<double> &errs);
 
-        double stddev(const std::vector<double> &func);
+        double stddev(std::vector<double> const & func);
+
     };
 
 } // namespace ccalib

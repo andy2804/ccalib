@@ -7,19 +7,12 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui_internal.h"
 #include "camera.h"
-#include "structures.h"
 #include "functions.h"
 #include "imgui_extensions.h"
 #include "calibrator.h"
 
-#include <ctime>
-#include <cstdio>
-#include <vector>
-#include <iostream>
 #include <SDL.h>
 #include <experimental/filesystem>
-#include <glad/glad.h>  // Initialize with gladLoadGL()
-#include <numeric>
 #include <stack>
 
 using namespace std;
@@ -83,7 +76,11 @@ int main(int, char **) {
     ImFont *font_normal = io.Fonts->AddFontFromFileTTF("../resources/Roboto-Regular.ttf", 16.0f);
     ImFont *font_title = io.Fonts->AddFontFromFileTTF("../resources/Roboto-Medium.ttf", 24.0f);
 
-    // general State variables
+    // UI specific variables
+    int widthParameterWindow = 350;
+    float spacing = (widthParameterWindow - ImGui::GetStyle().WindowPadding.x * 2) / 2;
+
+    // General State variables
     bool showCamera = true;
     bool showParameters = false;
     bool showCalibration = true;
@@ -99,7 +96,7 @@ int main(int, char **) {
     bool takeSnapshot = false;
     bool inTarget = false;
 
-    // camera specific state variables
+    // Camera specific state variables
     int camID = 0;
     int camFPS = 4;
     int camFMT = 0;
@@ -119,13 +116,12 @@ int main(int, char **) {
     ccalib::Corners frameCorners;
     ccalib::CoverageParameters coverage;
     ccalib::CalibrationParameters calibParams;
-    vector<ccalib::Snapshot> snapshots;
-    vector<cv::Point2f> corners;
+    vector <ccalib::Snapshot> snapshots;
+    vector <cv::Point2f> corners;
     vector<double> instanceErrs;
     float skewRatio = ((calib.checkerboardCols - 1.0f) / (calib.checkerboardRows - 1.0f));
     float imageMovement = 0.0f;
     int snapID = -1;
-//    int hoveredSnapID = -1;
 
     // Initialize Target Frames for automatic collection
     int curr_target = 0;
@@ -162,15 +158,10 @@ int main(int, char **) {
     target_frames.push_back({cv::Point2f(0.65f, 0.65f), cv::Point2f(0.95f, 0.65f),
                              cv::Point2f(0.95f, 0.95f), cv::Point2f(0.65f, 0.95f)});
 
-
-    // UI specific variables
-    int widthParameterWindow = 350;
-    float spacing = (widthParameterWindow - ImGui::GetStyle().WindowPadding.x * 2) / 2;
-
     // Camera Formats
     // TODO Use v4l2 VIDIOC_ENUM_FMT to read out all valid formats
     vector<int> camera_fps{5, 10, 15, 20, 30, 50, 60, 100, 120};
-    vector<string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
+    vector <string> camera_fmt{"YUVY", "YUY2", "YU12", "YV12", "RGB3", "BGR3", "Y16 ", "MJPG", "MPEG", "X264", "HEVC"};
     ccalib::ImageInstance img(cv::Size(camParams.width, camParams.height), CV_8UC3);
     ccalib::ImageInstance imgPrev(cv::Size(camParams.width, camParams.height), CV_8UC3);
     GLuint texture;
@@ -181,7 +172,7 @@ int main(int, char **) {
 
     // Get all v4l2 devices
     const fs::path device_dir("/dev");
-    vector<string> cameras;
+    vector <string> cameras;
 
     for (const auto &entry : fs::directory_iterator(device_dir)) {
         if (entry.path().string().find("video") != string::npos)
@@ -419,8 +410,7 @@ int main(int, char **) {
                 if (cam.getFrameCount() != imgPrev.id) {
                     img.id = cam.captureFrame(img.data);
                     img.hasCheckerboard = false;
-                }
-                else
+                } else
                     img = imgPrev;
             }
 
@@ -438,9 +428,34 @@ int main(int, char **) {
                         cv::cvtColor(gray, img.data, cv::COLOR_GRAY2RGB);
 
                         // TODO optimize procedure, only look for checkerboard in previous area + delta
-                        calib.findCorners(gray, corners);
-                        img.hasCheckerboard =
-                                corners.size() == (calib.checkerboardCols - 1) * (calib.checkerboardRows - 1);
+                        // Use prior to clip to ROI
+                        cv::Rect prior = cv::Rect(0, 0, img.data.cols, img.data.rows);
+                        double priorScale = 1.0f;
+                        if (imgPrev.hasCheckerboard) {
+                            ccalib::Corners priorFrameCorners = frameCorners;
+                            ccalib::relativeToAbsPoints(priorFrameCorners.points,
+                                                        cv::Size(img.data.cols, img.data.rows));
+                            ccalib::increaseRectSize(priorFrameCorners.points, frame.size * img.data.cols * 0.2f);
+                            prior = prior & cv::boundingRect(priorFrameCorners.points);
+                            gray = gray(prior);
+                            cv::normalize(gray, gray, 255, 0, cv::NORM_MINMAX);
+                            priorScale = gray.cols / 640.0f;
+                            cv::resize(gray, gray, cv::Size(int(gray.cols / priorScale), int(gray.rows / priorScale)));
+//                            cv::imshow("Prior", gray);
+//                            cv::waitKey(1);
+                        }
+
+                        // Find corners
+                        img.hasCheckerboard = calib.findCorners(gray, corners);
+
+                        // Add prior offset
+                        if (imgPrev.hasCheckerboard)
+                            for (auto &p : corners) {
+                                p *= priorScale;
+                                p.x += prior.x;
+                                p.y += prior.y;
+                            }
+
                         if (img.hasCheckerboard) {
                             ccalib::Corners fc(
                                     {corners[0], corners[calib.checkerboardCols - 2], corners[corners.size() - 1],
@@ -572,7 +587,7 @@ int main(int, char **) {
                                 snapID = -1;
                                 if (snapshots.size() >= 4) {
                                     calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
-                                    calibrated = calibParams.reprojErr < 0.3f;
+                                    calibrated = calibParams.reprojErr <= 0.3f && calibParams.reprojErrVar <= 0.1f;
                                 }
                                 ccalib::updateCoverage(snapshots, coverage);
                             }
@@ -595,52 +610,44 @@ int main(int, char **) {
             // Results Tab
             // ==========================================
 
-            if (snapshots.size() >= 4 && calibrationMode && calibrated) {
-                if (ImGui::BeginTabItem("Results")) {
-                    // Results Card
-                    if (ccalib::BeginCard("Results", font_title, 7.5,
-                                          showResults)) {
-                        if (ccalib::MaterialButton("Re-Calibrate", false) ||
-                            snapshots.size() != instanceErrs.size()) {
-                            calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
-                            calibrated = calibParams.reprojErr < 0.3f;
-                            undistort = true;
-                        }
+            if (calibrated && ImGui::BeginTabItem("Results")) {
+                // Results Card
+                if (ccalib::BeginCard("Results", font_title, 7.5, showResults)) {
+//                    if (ccalib::MaterialButton("Re-Calibrate", false) || snapshots.size() != instanceErrs.size()) {
+//                        calib.calibrateCameraBG(snapshots, calibParams, instanceErrs);
+//                        calibrated = calibParams.reprojErr < 0.3f;
+//                        undistort = true;
+//                    }
 
-                        if (calibrated) {
-                            ImGui::SameLine();
-                            if (ccalib::MaterialButton("Export", calibrated)) {
-                                cv::FileStorage fs("calibration.yaml",
-                                                   cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
-                                fs << "image_width" << camParams.width;
-                                fs << "image_height" << camParams.height;
-                                fs << "camera_name" << cameras[camID];
-                                fs << "camera_matrix" << calibParams.K;
-                                fs << "distortion_model" << "plumb_bob";
-                                fs << "distortion_coefficients" << calibParams.D;
-                                fs << "rectification_matrix" << cv::Mat::eye(3, 3, CV_64F);
-                                cv::Mat P;
-                                cv::hconcat(calibParams.K, cv::Mat::zeros(3, 1, CV_64F), P);
-                                fs << "projection_matrix" << P;
-                                fs.release();
-
-                                ImGui::SameLine();
-                                ImGui::Text("Exported!");
-                            }
-                            stringstream result_ss;
-                            result_ss << "K = " << calibParams.K << endl << endl;
-                            result_ss << "D = " << calibParams.D;
-                            string result = result_ss.str();
-                            char output[result.size() + 1];
-                            strcpy(output, result.c_str());
-                            ImGui::InputTextMultiline("##result", output, result.size(),
-                                                      ImVec2(0, ImGui::GetTextLineHeight() * 11),
-                                                      ImGuiInputTextFlags_ReadOnly);
-                        }
-                        ccalib::EndCard();
+                    ImGui::SameLine();
+                    if (ccalib::MaterialButton("Export", calibrated)) {
+                        cv::FileStorage fs("calibration.yaml", cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
+                        fs << "image_width" << camParams.width;
+                        fs << "image_height" << camParams.height;
+                        fs << "camera_name" << cameras[camID];
+                        fs << "camera_matrix" << calibParams.K;
+                        fs << "distortion_model" << "plumb_bob";
+                        fs << "distortion_coefficients" << calibParams.D;
+                        fs << "rectification_matrix" << cv::Mat::eye(3, 3, CV_64F);
+                        cv::Mat P;
+                        cv::hconcat(calibParams.K, cv::Mat::zeros(3, 1, CV_64F), P);
+                        fs << "projection_matrix" << P;
+                        fs.release();
+                        ImGui::SameLine();
+                        ImGui::Text("Exported!");
                     }
-                    ImGui::EndTabItem();
+                    stringstream result_ss;
+                    result_ss << "K = " << calibParams.K << endl << endl;
+                    result_ss << "D = " << calibParams.D;
+                    string result = result_ss.str();
+                    char output[result.size() + 1];
+                    strcpy(output, result.c_str());
+                    ImGui::InputTextMultiline("##result", output, result.size(),
+                                              ImVec2(0, ImGui::GetTextLineHeight() * 11),
+                                              ImGuiInputTextFlags_ReadOnly);
+                    ccalib::EndCard();
                 }
+                ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
 
@@ -676,6 +683,7 @@ int main(int, char **) {
                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                      ImGuiWindowFlags_NoTitleBar);
 
+        // Image to texture
         cv::Mat preview = img.data.clone();
         if (cameraOn) {
             if (snapID == -1) {
@@ -690,7 +698,7 @@ int main(int, char **) {
             ccalib::mat2Texture(preview, texture);
         }
 
-        // Camera image
+        // Resize Camera image
         float width_avail = ImGui::GetContentRegionAvail().x;
         float height_avail = ImGui::GetContentRegionAvail().y;
         float scaling = 1.0f;
@@ -715,7 +723,7 @@ int main(int, char **) {
 
         // Draw Corners
         if (calibrationMode && !corners.empty()) {
-            vector<cv::Point2f> drawCorners(corners);
+            vector <cv::Point2f> drawCorners(corners);
             if (flipImg && snapID == -1) {
                 ccalib::flipPoints(drawCorners, img_size_old);
             }
@@ -747,7 +755,7 @@ int main(int, char **) {
         // Draw target frames
         if (calibrationMode && curr_target < target_frames.size()) {
             // Convert and flip points
-            vector<cv::Point2f> target_corners(target_frames[curr_target]);
+            vector <cv::Point2f> target_corners(target_frames[curr_target]);
             if (flipImg && snapID == -1) {
                 ccalib::flipPoints(target_corners, cv::Size(1, 1));
             }
@@ -788,6 +796,7 @@ int main(int, char **) {
             }
         }
 
+        // Display reprojection error
         if (calibParams.reprojErr != DBL_MAX) {
             string reproj_error;
             if (snapID == -1)
