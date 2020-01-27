@@ -130,16 +130,18 @@ namespace ccalib {
         }
 
         if (ImGui::IsItemHovered())
-            col_bg = ImGui::GetColorU32(ImLerp(ImVec4(0.78f, 0.78f, 0.78f, 1.0f), ImVec4(0.64f, 0.83f, 0.34f, 1.0f), t));
+            col_bg = ImGui::GetColorU32(
+                    ImLerp(ImVec4(0.78f, 0.78f, 0.78f, 1.0f), ImVec4(0.64f, 0.83f, 0.34f, 1.0f), t));
         else
-            col_bg = ImGui::GetColorU32(ImLerp(ImVec4(0.85f, 0.85f, 0.85f, 1.0f), ImVec4(0.56f, 0.83f, 0.26f, 1.0f), t));
+            col_bg = ImGui::GetColorU32(
+                    ImLerp(ImVec4(0.85f, 0.85f, 0.85f, 1.0f), ImVec4(0.56f, 0.83f, 0.26f, 1.0f), t));
 
         draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height), col_bg, height * 0.5f);
         draw_list->AddCircleFilled(ImVec2(p.x + radius + t * (width - radius * 2.0f), p.y + radius), radius - 1.5f,
                                    IM_COL32(255, 255, 255, 255));
     }
 
-    void CoveredBar(const float &start, const float &stop, const float &indicator) {
+    void CoveredBar(const float &start, const float &stop, const float &indicator, const float &highlight) {
         ImVec2 p = ImGui::GetCursorScreenPos();
         ImDrawList *draw_list = ImGui::GetWindowDrawList();
 
@@ -162,19 +164,28 @@ namespace ccalib {
                                        ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
         }
 
+        if (highlight >= 0) {
+            ImGuiContext &g = *GImGui;
+            ImU32 col_bg;
+            float ANIM_SPEED = 0.32f;
+            float t_anim = cos(g.LastActiveIdTimer / ANIM_SPEED);
+            col_bg = ImGui::GetColorU32(ImLerp(ImVec4(0.56f, 0.83f, 0.26f, 1.0f), ImVec4(0.72f, 0.91f, 0.42f, 1.0f), t_anim));
+            draw_list->AddCircle(ImVec2(p.x + highlight * width, p.y + height / 2.0f), height + 2.5f, col_bg, 12, 2.0f);
+        }
+
         ImGui::InvisibleButton("##covered_bar", ImVec2(width, ImGui::GetFrameHeight()));
     }
 
-    bool MaterialButton(const char *label, bool focus, const ImVec2 &size) {
+    bool MaterialButton(const char *label, bool focus, const bool& enabled, const ImVec2 &size) {
         // Get Position and Drawlist
         ImVec2 p = ImGui::GetCursorScreenPos();
         ImDrawList *draw_list = ImGui::GetWindowDrawList();
 
-
         // Draw button
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.56f, 0.83f, 0.26f, 0.8f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.56f, 0.83f, 0.26f, 0.6f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.56f, 0.83f, 0.26f, 1.0f));
+        ImVec4 col_b = enabled ? ImVec4(0.56f, 0.83f, 0.26f, 1.0f) : ImVec4(0.83f, 0.83f, 0.83f, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, col_b); col_b.w = 0.8f;
+        ImGui::PushStyleColor(ImGuiCol_Button, col_b); col_b.w = 0.6f;
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, col_b);
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
         bool clicked = ImGui::Button(label, size);
@@ -199,19 +210,21 @@ namespace ccalib {
                                ImDrawCornerFlags_All, padding * 2);
         }
 
-        return clicked;
+        return clicked && enabled;
     }
 
-    bool MaterialCancelButton(const char *label, bool focus, const ImVec2 &size) {
+    bool MaterialCancelButton(const char *label, bool focus, const bool& enabled, const ImVec2 &size) {
         // Get Position and Drawlist
         ImVec2 p = ImGui::GetCursorScreenPos();
         ImDrawList *draw_list = ImGui::GetWindowDrawList();
 
 
         // Draw button
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.83f, 0.26f, 0.26f, 0.8f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.83f, 0.26f, 0.26f, 0.6f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.83f, 0.26f, 0.26f, 1.0f));
+        // Draw button
+        ImVec4 col_b = enabled ? ImVec4(0.83f, 0.26f, 0.26f, 1.0f) : ImVec4(0.83f, 0.83f, 0.83f, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, col_b); col_b.w = 0.8f;
+        ImGui::PushStyleColor(ImGuiCol_Button, col_b); col_b.w = 0.6f;
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, col_b);
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
         bool clicked = ImGui::Button(label, size);
@@ -236,7 +249,7 @@ namespace ccalib {
                                ImDrawCornerFlags_All, padding * 2);
         }
 
-        return clicked;
+return clicked && enabled;
     }
 
     bool Hoverable(const std::string &text, const std::string &toolTip, const ImVec4 &color, const ImVec2 &size) {
@@ -279,7 +292,7 @@ namespace ccalib {
         std::string cancelID = "x##" + id;
         ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.33f));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-        bool clicked = ccalib::MaterialCancelButton(cancelID.c_str(), focus, size);
+        bool clicked = ccalib::MaterialCancelButton(cancelID.c_str(), focus, true, size);
         ImGui::PopStyleVar(2);
         return clicked;
     }
@@ -340,7 +353,8 @@ namespace ccalib {
         ImGui::GetWindowDrawList()->AddRectFilled(bb.Min, bb.Max, col_bg, style.ChildRounding);
 
         ImGui::SetCursorPos(p);
-        ImGui::BeginChild(id, frame_bb.GetSize(), true, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
+        ImGui::BeginChild(id, frame_bb.GetSize(), true,
+                          ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
         ImGui::PushFont(title_font);
         ImGui::Text("%s", label);
 
@@ -366,7 +380,8 @@ namespace ccalib {
         ImGui::ItemSize(bb, style.FramePadding.y);
     }
 
-    void drawRectangle(const std::vector<cv::Point2f> &corners, const ImVec4 &color, const float &thickness, bool focus) {
+    void
+    drawRectangle(const std::vector<cv::Point2f> &corners, const ImVec4 &color, const float &thickness, bool focus) {
         // Get Position and Drawlist
         ImDrawList *draw_list = ImGui::GetWindowDrawList();
         ImGuiContext &g = *GImGui;

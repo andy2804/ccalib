@@ -28,6 +28,12 @@ namespace ccalib {
 
     void updateCoverage(const std::vector<ccalib::Snapshot> &snapshots, ccalib::CoverageParameters &coverage);
 
+    bool checkCoverage(const ccalib::CoverageParameters &coverage, const ccalib::CheckerboardFrame &frame,
+                       const float &diff = 0.05f);
+
+    bool checkFrameInTarget(const ccalib::CheckerboardFrame &actualFrame, const ccalib::CheckerboardFrame &targetFrame,
+                            const float &tolerance = 0.05f);
+
 } // namespace ccalib
 
 #endif // FUNCTIONS_H

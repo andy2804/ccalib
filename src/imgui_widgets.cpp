@@ -97,7 +97,7 @@ namespace ccalib {
                     if (ImGui::Selectable(std::to_string(state.cameraFPS[i]).c_str(), is_selected)) {
                         state.fpsID = i;
                         if (!ImGui::IsMouseClicked(0)) {
-                            state.camParams.fps = (int) state.cameraFPS[state.fpsID];
+                            camParams.fps = (int) state.cameraFPS[state.fpsID];
                             cam.updateFramerate(camParams.fps);
                         }
                     }
@@ -125,7 +125,7 @@ namespace ccalib {
                         state.fmtID = i;
                         if (!ImGui::IsMouseClicked(0)) {
                             camParams.format = state.cameraFMTS[state.fmtID];
-                            cam.updateFormat(state.camParams.format);
+                            cam.updateFormat(camParams.format);
                         }
                     }
                     if (is_selected)
@@ -139,53 +139,54 @@ namespace ccalib {
     }
 
     void CalibrationParametersCard(ccalib::GUIStateVariables &state, ccalib::Calibrator &calib) {
-        if (ccalib::BeginCard("Calibration", state.fontTitle, 5.5, state.showCalibration)) {
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Rows");
-            ImGui::SameLine(state.widthItemSpacing);
-            ImGui::InputInt("##chkbrd_rows", &calib.checkerboardRows, 1);
-
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Cols");
-            ImGui::SameLine(state.widthItemSpacing);
-            ImGui::InputInt("##chkbrd_cols", &calib.checkerboardCols, 1);
-
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Size in [m]");
-            ImGui::SameLine(state.widthItemSpacing);
-            ImGui::InputFloat("##chkbrd_size", &calib.checkerboardSize, 0.001f);
-
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Calibration");
-            const char *button_text = state.calibrationMode ? "Reset" : "Start";
-            ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
-                            style.FramePadding.x);
-            if (state.calibrationMode)
-                ccalib::MaterialCancelButton(button_text, !state.calibrationMode && cam.isStreaming());
-            else
-                ccalib::MaterialButton(button_text, !state.calibrationMode && cam.isStreaming());
-            if (ImGui::IsItemClicked()) {
-                state.calibrationMode = !state.calibrationMode;
-                if (state.cameraOn && state.calibrationMode) {
-                    // Reset all parameters
-                    ccalib::CalibrationParameters newCalibParams;
-                    ccalib::CoverageParameters newCoverage;
-                    ccalib::CheckerboardFrame newFrame;
-                    coverage = newCoverage;
-                    frame = newFrame;
-                    calibParams = newCalibParams;
-                    state.undistort = false;
-                    state.snapID = -1;
-                    snapshots.clear();
-                    instanceErrs.clear();
-                }
-            }
-
-            if (!state.cameraOn)
-                state.calibrationMode = false;
-
-            ccalib::EndCard();
-        }
+//        if (ccalib::BeginCard("Calibration", state.fontTitle, 5.5, state.showCalibration)) {
+//            ImGuiStyle &style = ImGui::GetStyle();
+//            ImGui::AlignTextToFramePadding();
+//            ImGui::Text("Rows");
+//            ImGui::SameLine(state.widthItemSpacing);
+//            ImGui::InputInt("##chkbrd_rows", &calib.checkerboardRows, 1);
+//
+//            ImGui::AlignTextToFramePadding();
+//            ImGui::Text("Cols");
+//            ImGui::SameLine(state.widthItemSpacing);
+//            ImGui::InputInt("##chkbrd_cols", &calib.checkerboardCols, 1);
+//
+//            ImGui::AlignTextToFramePadding();
+//            ImGui::Text("Size in [m]");
+//            ImGui::SameLine(state.widthItemSpacing);
+//            ImGui::InputFloat("##chkbrd_size", &calib.checkerboardSize, 0.001f);
+//
+//            ImGui::AlignTextToFramePadding();
+//            ImGui::Text("Calibration");
+//            const char *button_text = state.calibrationMode ? "Reset" : "Start";
+//            ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
+//                            style.FramePadding.x);
+//            if (state.calibrationMode)
+//                ccalib::MaterialCancelButton(button_text, !state.calibrationMode && cam.isStreaming());
+//            else
+//                ccalib::MaterialButton(button_text, !state.calibrationMode && cam.isStreaming());
+//            if (ImGui::IsItemClicked()) {
+//                state.calibrationMode = !state.calibrationMode;
+//                if (state.cameraOn && state.calibrationMode) {
+//                    // Reset all parameters
+//                    ccalib::CalibrationParameters newCalibParams;
+//                    ccalib::CoverageParameters newCoverage;
+//                    ccalib::CheckerboardFrame newFrame;
+//                    coverage = newCoverage;
+//                    frame = newFrame;
+//                    calibParams = newCalibParams;
+//                    state.undistort = false;
+//                    state.snapID = -1;
+//                    snapshots.clear();
+//                    instanceErrs.clear();
+//                }
+//            }
+//
+//            if (!state.cameraOn)
+//                state.calibrationMode = false;
+//
+//            ccalib::EndCard();
+//        }
     }
 
 } // namespace ccalib
