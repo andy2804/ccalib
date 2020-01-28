@@ -15,11 +15,11 @@ namespace ccalib {
 
     void ToggleButton(const char *str_id, bool *v, const bool focus = false);
 
-    void CoveredBar(const float &start, const float &stop, const float &indicator = -1);
+    void CoveredBar(const float &start, const float &stop, const float &indicator = -1, const float &highlight = -1);
 
-    bool MaterialButton(const char *label, bool focus = false, const ImVec2 &size = ImVec2(0, 0));
+    bool MaterialButton(const char *label, bool focus = false, const bool& enabled = true, const ImVec2 &size = ImVec2(0, 0));
 
-    bool MaterialCancelButton(const char *label, bool focus, const ImVec2 &size = ImVec2(0, 0));
+    bool MaterialCancelButton(const char *label, bool focus, const bool& enabled = true, const ImVec2 &size = ImVec2(0, 0));
 
     bool Hoverable(const std::string &text, const std::string &toolTip, const ImVec4 &color, const ImVec2 &size);
 

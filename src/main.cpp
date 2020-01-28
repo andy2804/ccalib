@@ -95,12 +95,12 @@ int main(int, char **) {
     // TODO create stateVariables struct
     // TODO pack all Cards into single "widgets"
     bool showCamera = true;
-    bool showParameters = false;
-    bool showCalibration = false;
+    bool showCamParameters = false;
+    bool showCalParameters = false;
+    bool showCalibration = true;
     bool showCoverage = true;
     bool showSnapshots = true;
     bool showResults = true;
-    bool calibrationMode = false;
     bool camParamsChanged = false;
     bool frameChanged = false;
     bool cameraOn = false;
@@ -109,6 +109,7 @@ int main(int, char **) {
     bool calibrated = false;
     bool takeSnapshot = false;
     bool inTarget = false;
+    bool initialized = false;
 
     // Camera specific state variables
     int camID = 0;
@@ -124,12 +125,12 @@ int main(int, char **) {
     camParams.format = "YUVY";
 
     // Calibration specific state variables
+    string statusText;
     ccalib::CheckerboardFrame frame;
     ccalib::Calibrator calib(8, 11, 0.022);
     ccalib::Corners frameCorners;
-
-    // TODO new implementation of target corners
-//    ccalib::Corners targetCorners;
+    ccalib::Corners initialCorners({cv::Point2f(0.25, 0.25), cv::Point2f(0.75, 0.25),
+                                    cv::Point2f(0.75, 0.75), cv::Point2f(0.25, 0.75)});
 
     ccalib::CoverageParameters coverage;
     ccalib::CalibrationParameters calibParams;
@@ -207,132 +208,132 @@ int main(int, char **) {
 
             if (ImGui::BeginTabItem("Parameters")) {
                 // Camera Card
-                ccalib::CameraCard(state, cam, camParams);
-//                if (ccalib::BeginCard("Camera", fontTitle, 4.5f + calibrated, showCamera)) {
-//                    ImGui::AlignTextToFramePadding();
-//                    ImGui::Text("Device");
-//                    ImGui::SameLine(spacing);
-//
-//                    if (ImGui::BeginCombo("##camera_selector", cameras[camID].c_str(), 0)) {
-//                        for (int i = 0; i < cameras.size(); i++) {
-//                            bool is_selected = (cameras[camID] == cameras[i]);
-//                            if (ImGui::Selectable(cameras[i].c_str(), is_selected)) {
-//                                if (cameraOn) {
-//                                    cam.stopStream();
-//                                    cam.close();
-//                                    cameraOn = false;
-//                                }
-//                                camID = i;
-//                            }
-//                            if (is_selected) {
-//                                ImGui::SetItemDefaultFocus();
-//                            }   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
-//                        }
-//                        ImGui::EndCombo();
-//                    }
-//
-//                    ImGui::AlignTextToFramePadding();
-//                    ImGui::Text("Stream");
-//                    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
-//                    ccalib::ToggleButton("##cam_toggle", &cameraOn, !cameraOn);
-//                    if (cameraOn && ImGui::IsItemClicked(0)) {
-//                        cam.open();
-//                        cam.updateParameters(camParams);
-//                        cam.startStream();
-//                        camParamsChanged = true;
-//                    } else if (!cameraOn & ImGui::IsItemClicked(0)) {
-//                        cam.stopStream();
-//                        cam.close();
-//                    }
-//
-//                    ImGui::AlignTextToFramePadding();
-//                    ImGui::Text("Flip Image");
-//                    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
-//                    ccalib::ToggleButton("##flip_toggle", &flipImg);
-//
-//                    if (calibrated) {
-//                        ImGui::AlignTextToFramePadding();
-//                        ImGui::Text("Undistort Image");
-//                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
-//                        ccalib::ToggleButton("##undistort_toggle", &undistort);
-//                    }
-//
-//                    ccalib::EndCard();
-//                }
+//                ccalib::CameraCard(state, cam, camParams);
+                if (ccalib::BeginCard("Camera", fontTitle, 4.5f + calibrated, showCamera)) {
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Device");
+                    ImGui::SameLine(spacing);
+
+                    if (ImGui::BeginCombo("##camera_selector", cameras[camID].c_str(), 0)) {
+                        for (int i = 0; i < cameras.size(); i++) {
+                            bool is_selected = (cameras[camID] == cameras[i]);
+                            if (ImGui::Selectable(cameras[i].c_str(), is_selected)) {
+                                if (cameraOn) {
+                                    cam.stopStream();
+                                    cam.close();
+                                    cameraOn = false;
+                                }
+                                camID = i;
+                            }
+                            if (is_selected) {
+                                ImGui::SetItemDefaultFocus();
+                            }   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+                        }
+                        ImGui::EndCombo();
+                    }
+
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Stream");
+                    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
+                    ccalib::ToggleButton("##cam_toggle", &cameraOn, !cameraOn);
+                    if (cameraOn && ImGui::IsItemClicked(0)) {
+                        cam.open();
+                        cam.updateParameters(camParams);
+                        cam.startStream();
+                        camParamsChanged = true;
+                    } else if (!cameraOn & ImGui::IsItemClicked(0)) {
+                        cam.stopStream();
+                        cam.close();
+                    }
+
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Flip Image");
+                    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
+                    ccalib::ToggleButton("##flip_toggle", &flipImg);
+
+                    if (calibrated) {
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("Undistort Image");
+                        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::GetFrameHeight() * 1.8f);
+                        ccalib::ToggleButton("##undistort_toggle", &undistort);
+                    }
+
+                    ccalib::EndCard();
+                }
 
                 // Camera Parameters Card
-                ccalib::CameraParametersCard(state, cam, camParams);
-//                if (ccalib::BeginCard("Parameters", fontTitle, 5.5, showParameters)) {
-//                    ImGui::AlignTextToFramePadding();
-//                    ImGui::Text("Resolution");
-//                    ImGui::SameLine(spacing);
-//                    ImGui::PushItemWidth(44);
-//                    ImGui::InputInt("##width", &camParams.width, 0);
-//                    ImGui::SameLine();
-//                    ImGui::AlignTextToFramePadding();
-//                    ImGui::Text("x");
-//                    ImGui::SameLine();
-//                    ImGui::InputInt("##height", &camParams.height, 0);
-//                    ImGui::PopItemWidth();
-//                    const char *button_text = "Set";
-//                    ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
-//                                    style.FramePadding.x);
-//                    if (ccalib::MaterialButton(button_text)) {
-//                        cam.updateResolution(camParams.width, camParams.height);
-//                        camParamsChanged = true;
-//                    }
-//
-//                    ImGui::AlignTextToFramePadding();
-//                    ImGui::Text("Framerate");
-//                    ImGui::SameLine(spacing);
-//                    if (ImGui::BeginCombo("##camera_fps", to_string(camera_fps[camFPS]).c_str(), 0)) {
-//                        for (int i = 0; i < camera_fps.size(); i++) {
-//                            bool is_selected = (camera_fps[camFPS] == camera_fps[i]);
-//                            if (ImGui::Selectable(to_string(camera_fps[i]).c_str(), is_selected)) {
-//                                camFPS = i;
-//                                if (!ImGui::IsMouseClicked(0)) {
-//                                    camParams.fps = (int) camera_fps[camFPS];
-//                                    cam.updateFramerate(camParams.fps);
-//                                }
-//                            }
-//                            if (is_selected)
-//                                ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
-//                        }
-//                        ImGui::EndCombo();
-//                        camParamsChanged = true;
-//                    }
-//
-//                    ImGui::AlignTextToFramePadding();
-//                    ImGui::Text("Exposure Time");
-//                    ImGui::SameLine(spacing);
-//                    if (ImGui::SliderFloat("##camera_exptime", &camParams.exposure, 0, 1, "%.3f", 2.0)) {
-//                        cam.updateExposure(camParams.exposure);
-//                    }
-//
-//                    ImGui::AlignTextToFramePadding();
-//                    ImGui::Text("Select Format");
-//                    ImGui::SameLine(spacing);
-//                    if (ImGui::BeginCombo("##camera_fmt", camera_fmt[camFMT].c_str(), 0)) {
-//                        for (int i = 0; i < camera_fmt.size(); i++) {
-//                            bool is_selected = (camera_fmt[camFMT] == camera_fmt[i]);
-//                            if (ImGui::Selectable(camera_fmt[i].c_str(), is_selected)) {
-//                                camFMT = i;
-//                                if (!ImGui::IsMouseClicked(0)) {
-//                                    camParams.format = camera_fmt[camFMT];
-//                                    cam.updateFormat(camParams.format);
-//                                }
-//                            }
-//                            if (is_selected)
-//                                ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
-//                        }
-//                        ImGui::EndCombo();
-//                        camParamsChanged = true;
-//                    }
-//                    ccalib::EndCard();
-//                }
+//                ccalib::CameraParametersCard(state, cam, camParams);
+                if (ccalib::BeginCard("Camera Parameters", fontTitle, 5.5, showCamParameters)) {
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Resolution");
+                    ImGui::SameLine(spacing);
+                    ImGui::PushItemWidth(44);
+                    ImGui::InputInt("##width", &camParams.width, 0);
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("x");
+                    ImGui::SameLine();
+                    ImGui::InputInt("##height", &camParams.height, 0);
+                    ImGui::PopItemWidth();
+                    const char *button_text = "Set";
+                    ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
+                                    style.FramePadding.x);
+                    if (ccalib::MaterialButton(button_text)) {
+                        cam.updateResolution(camParams.width, camParams.height);
+                        camParamsChanged = true;
+                    }
+
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Framerate");
+                    ImGui::SameLine(spacing);
+                    if (ImGui::BeginCombo("##camera_fps", to_string(camera_fps[camFPS]).c_str(), 0)) {
+                        for (int i = 0; i < camera_fps.size(); i++) {
+                            bool is_selected = (camera_fps[camFPS] == camera_fps[i]);
+                            if (ImGui::Selectable(to_string(camera_fps[i]).c_str(), is_selected)) {
+                                camFPS = i;
+                                if (!ImGui::IsMouseClicked(0)) {
+                                    camParams.fps = (int) camera_fps[camFPS];
+                                    cam.updateFramerate(camParams.fps);
+                                }
+                            }
+                            if (is_selected)
+                                ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+                        }
+                        ImGui::EndCombo();
+                        camParamsChanged = true;
+                    }
+
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Exposure Time");
+                    ImGui::SameLine(spacing);
+                    if (ImGui::SliderFloat("##camera_exptime", &camParams.exposure, 0, 1, "%.3f", 2.0)) {
+                        cam.updateExposure(camParams.exposure);
+                    }
+
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Select Format");
+                    ImGui::SameLine(spacing);
+                    if (ImGui::BeginCombo("##camera_fmt", camera_fmt[camFMT].c_str(), 0)) {
+                        for (int i = 0; i < camera_fmt.size(); i++) {
+                            bool is_selected = (camera_fmt[camFMT] == camera_fmt[i]);
+                            if (ImGui::Selectable(camera_fmt[i].c_str(), is_selected)) {
+                                camFMT = i;
+                                if (!ImGui::IsMouseClicked(0)) {
+                                    camParams.format = camera_fmt[camFMT];
+                                    cam.updateFormat(camParams.format);
+                                }
+                            }
+                            if (is_selected)
+                                ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+                        }
+                        ImGui::EndCombo();
+                        camParamsChanged = true;
+                    }
+                    ccalib::EndCard();
+                }
 
                 // Calibration Parameters Card
-                if (ccalib::BeginCard("Calibration", fontTitle, 5.5, showCalibration)) {
+                if (ccalib::BeginCard("Calibration Parameters", fontTitle, 4.5, showCalParameters)) {
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Rows");
                     ImGui::SameLine(spacing);
@@ -347,35 +348,6 @@ int main(int, char **) {
                     ImGui::Text("Size in [m]");
                     ImGui::SameLine(spacing);
                     ImGui::InputFloat("##chkbrd_size", &calib.checkerboardSize, 0.001f);
-
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Calibration");
-                    const char *button_text = calibrationMode ? "Reset" : "Start";
-                    ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(button_text).x -
-                                    style.FramePadding.x);
-                    if (calibrationMode)
-                        ccalib::MaterialCancelButton(button_text, !calibrationMode && cam.isStreaming());
-                    else
-                        ccalib::MaterialButton(button_text, !calibrationMode && cam.isStreaming());
-                    if (ImGui::IsItemClicked()) {
-                        calibrationMode = !calibrationMode;
-                        if (cameraOn && calibrationMode) {
-                            // Reset all parameters
-                            ccalib::CalibrationParameters newCalibParams;
-                            ccalib::CoverageParameters newCoverage;
-                            ccalib::CheckerboardFrame newFrame;
-                            coverage = newCoverage;
-                            frame = newFrame;
-                            calibParams = newCalibParams;
-                            undistort = false;
-                            snapID = -1;
-                            snapshots.clear();
-                            instanceErrs.clear();
-                        }
-                    }
-
-                    if (!cameraOn)
-                        calibrationMode = false;
 
                     ccalib::EndCard();
                 }
@@ -406,7 +378,7 @@ int main(int, char **) {
             // Calibration Snapshots
             // ==========================================
 
-            if (calibrationMode && ImGui::BeginTabItem("Calibration")) {
+            if (cam.isOpened() && ImGui::BeginTabItem("Calibration")) {
 
                 // Detect Checkerboard
                 if (cam.isStreaming() && frameChanged) {
@@ -448,45 +420,68 @@ int main(int, char **) {
                 }
 
                 // Show Coverage Card
-                if (ccalib::BeginCard("Coverage", fontTitle, 9.5, showCoverage)) {
+                if (ccalib::BeginCard("Calibration", fontTitle, 2.3, showCalibration)) {
+                    if (!initialized)
+                        statusText = "Waiting for initialization... ";
                     ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Horizontal Coverage");
+                    ImGui::Text("%s", statusText.c_str());
+                    ImGui::SameLine(ImGui::GetWindowContentRegionWidth() - 44);
 
-                    ccalib::CoveredBar(coverage.x_min - 0.1f, coverage.x_max + 0.1f, 1.0f - frame.pos.x);
-
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Vertical Coverage");
-
-                    ccalib::CoveredBar(coverage.y_min - 0.1f, coverage.y_max + 0.1f, 1.0f - frame.pos.y);
-
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Size Coverage");
-                    ccalib::CoveredBar(coverage.size_min - 0.1f, coverage.size_max + 0.1f, frame.size);
-
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("Skew Coverage");
-                    ccalib::CoveredBar(coverage.skew_min - 0.1f, coverage.skew_max + 0.1f, frame.skew);
+                    ccalib::MaterialCancelButton("Reset", false);
+                    if (ImGui::IsItemClicked()) {
+                        // Reset all parameters
+                        ccalib::CalibrationParameters newCalibParams;
+                        ccalib::CoverageParameters newCoverage;
+                        ccalib::CheckerboardFrame newFrame;
+                        coverage = newCoverage;
+                        frame = newFrame;
+                        calibParams = newCalibParams;
+                        undistort = false;
+                        initialized = false;
+                        calibrated = false;
+                        snapID = -1;
+                        snapshots.clear();
+                        instanceErrs.clear();
+                    }
 
                     ccalib::EndCard();
                 }
 
+                // Show Coverage Card
+                if (ccalib::BeginCard("Coverage", fontTitle, 9.5, showCoverage)) {
+                    float highlight = !initialized ? 0.5f : -1;
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Horizontal Coverage");
+                    ccalib::CoveredBar(coverage.x_min - 0.1f, coverage.x_max + 0.1f, 1.0f - frame.pos.x, highlight);
+
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Vertical Coverage");
+                    ccalib::CoveredBar(coverage.y_min - 0.1f, coverage.y_max + 0.1f, 1.0f - frame.pos.y, highlight);
+
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Size Coverage");
+                    ccalib::CoveredBar(coverage.size_min - 0.1f, coverage.size_max + 0.1f, frame.size, highlight);
+
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Skew Coverage");
+                    ccalib::CoveredBar(coverage.skew_min - 0.1f, coverage.skew_max + 0.1f, frame.skew, highlight);
+                    ccalib::EndCard();
+                }
+
                 // Snapshots Card
-                if (ccalib::BeginCard("Snapshots", fontTitle, 3.3f + snapshots.size() * 0.78f, showSnapshots)) {
+                if (ccalib::BeginCard("Snapshots", fontTitle, 2.7f + snapshots.size() * 0.78f, showSnapshots)) {
                     // Collect snapshot button
-                    string statusText;
-                    if (ccalib::MaterialButton("Snapshot", !calibrated) && cam.isStreaming())
+                    if (ccalib::MaterialButton("Snapshot", !calibrated && initialized, initialized) && cam.isStreaming())
                         takeSnapshot = true;
 
                     // Check if view is different enough
-                    // TODO only check if started snapshotting (init pos)
-                    if (1.0f - frame.pos.x < coverage.x_min - snapshotDensity ||
-                        1.0f - frame.pos.x > coverage.x_max + snapshotDensity ||
-                        1.0f - frame.pos.y < coverage.y_min - snapshotDensity ||
-                        1.0f - frame.pos.y > coverage.y_max + snapshotDensity ||
-                        frame.size < coverage.size_min - snapshotDensity ||
-                        frame.size > coverage.size_max + snapshotDensity ||
-                        frame.skew < coverage.skew_min - snapshotDensity ||
-                        frame.skew > coverage.skew_max + snapshotDensity)
+                    if (!initialized) {
+                        if (ccalib::checkFrameInTarget(frame, *new ccalib::CheckerboardFrame()))
+                            takeSnapshot = true;
+                        else
+                            takeSnapshot = false;
+                    }
+                    if (initialized && ccalib::checkCoverage(coverage, frame, snapshotDensity))
                         takeSnapshot = true;
 
                     if (takeSnapshot && img.hasCheckerboard)
@@ -494,7 +489,7 @@ int main(int, char **) {
                     else if (img.hasCheckerboard)
                         statusText = "Ready ";
                     else {
-                        statusText = "No Checkerboard detected! ";
+                        statusText = "No Checkerboard! ";
                         imageMovement = 0.0f;
                     }
 
@@ -533,17 +528,19 @@ int main(int, char **) {
                     } else if (calib.isCalibrating())
                         statusText = "Calibrating... ";
 
-                    if (takeSnapshot || calib.isCalibrating())
+                    if (takeSnapshot || calib.isCalibrating() || !initialized)
                         statusText += loadingSequence[frameCount % 8 / 2];
 
                     ImGui::SameLine();
-                    ImGui::Text("%s", statusText.c_str());
                     ccalib::CoveredBar(0.0f, imageMovement);
 
                     // List all snapshots
                     // TODO progress bar of how many snapshots need to be taken
                     if (!snapshots.empty()) {
+                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 8);
                         // List all snapshots
+                        if (!initialized)
+                            initialized = true;
                         ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 16);
                         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 8));
                         ImGui::BeginColumns("##snapshots", 1, ImGuiColumnsFlags_NoBorder);
@@ -576,6 +573,12 @@ int main(int, char **) {
                                 snapshots.erase(snapshots.begin() + i);
                                 snapID = -1;
                                 ccalib::updateCoverage(snapshots, coverage);
+                                if (snapshots.size() < 4) {
+                                    instanceErrs.clear();
+                                    calibrated = false;
+                                }
+                                if (snapshots.empty())
+                                    initialized = false;
                             }
                         }
                         snapID = anyActiveSnaps ? snapID : -1;
@@ -636,6 +639,7 @@ int main(int, char **) {
             if (snapID != -1) {
                 cam.stopStream();
                 img = snapshots[snapID].img;
+                img.hasCheckerboard = true;
                 img.data = snapshots[snapID].img.data.clone();
                 corners = snapshots[snapID].corners;
                 frame = snapshots[snapID].frame;
@@ -707,61 +711,73 @@ int main(int, char **) {
         cv::Point2f offset(pos.x + widthParameterWindow, pos.y);
 
         // Draw Corners & Frame
-        if (calibrationMode && !frameCorners.points.empty()) {
-            ccalib::Corners drawFrameCorners = frameCorners;
-            vector<cv::Point2f> drawCorners(corners);
-            ccalib::relativeToAbsPoints(drawFrameCorners.points, imgSizeOld);
-            ccalib::increaseRectSize(drawFrameCorners.points, frame.size * img.data.cols * 0.1f);
+        if (!frameCorners.points.empty()) {
+            // Draw initial Frame
+            if (!initialized) {
+                ccalib::Corners temp_ic = initialCorners;
+                ccalib::relativeToAbsPoints(temp_ic.points, imgSizeOld);
+                ccalib::increaseRectSize(temp_ic.points, 0.5f * img.data.cols * 0.1f);
+                for (auto &p : temp_ic.points) {
+                    p *= scaling;
+                    p += offset;
+                }
+                ccalib::drawRectangle(temp_ic.points, ImVec4(0.91f, 0.83f, 0.26f, 1.00f), 8.0f, true);
+            }
+
+            ccalib::Corners temp_fc = frameCorners;
+            vector<cv::Point2f> temp_c(corners);
+            ccalib::relativeToAbsPoints(temp_fc.points, imgSizeOld);
+            ccalib::increaseRectSize(temp_fc.points, frame.size * img.data.cols * 0.1f);
             if (flipImg && snapID == -1) {
-                ccalib::flipPoints(drawCorners, imgSizeOld);
-                ccalib::flipPoints(drawFrameCorners.points, imgSizeOld);
+                ccalib::flipPoints(temp_c, imgSizeOld);
+                ccalib::flipPoints(temp_fc.points, imgSizeOld);
             }
 
             // Convert to img coordinates
-            for (auto &p : drawCorners) {
+            for (auto &p : temp_c) {
                 p *= scaling;
                 p += offset;
             }
-            for (auto &p : drawFrameCorners.points) {
+            for (auto &p : temp_fc.points) {
                 p *= scaling;
                 p += offset;
             }
 
             // Draw
-            ccalib::drawPoints(drawCorners, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), frame.size * 4.0f);
+            ccalib::drawPoints(temp_c, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), frame.size * 4.0f);
             if (inTarget) {
-                ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.13f, 0.83f, 0.91f, 1.00f), 16.0f, false);
+                ccalib::drawRectangle(temp_fc.points, ImVec4(0.13f, 0.83f, 0.91f, 1.00f), 16.0f, false);
                 if (frameCount - frameLastAction > 10)
                     inTarget = false;
             } else if (takeSnapshot)
-                ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.91f, 0.83f, 0.26f, 1.00f), 8.0f, true);
+                ccalib::drawRectangle(temp_fc.points, ImVec4(0.91f, 0.83f, 0.26f, 1.00f), 8.0f, true);
             else
-                ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
+                ccalib::drawRectangle(temp_fc.points, ImVec4(0.56f, 0.83f, 0.26f, 1.00f), 4.0f, false);
         }
 
         // Draw previous recorded snapshots
-        if (!snapshots.empty()) {
+        if (!snapshots.empty() && img.hasCheckerboard) {
             int n = snapshots.size() - 1;
             for (int i = n; i > 0; i--) {
-                ccalib::Corners drawFrameCorners = snapshots[i].frameCorners;
-                ccalib::relativeToAbsPoints(drawFrameCorners.points, imgSizeOld);
-                ccalib::increaseRectSize(drawFrameCorners.points, snapshots[i].frame.size * img.data.cols * 0.1f);
+                ccalib::Corners temp_fc = snapshots[i].frameCorners;
+                ccalib::relativeToAbsPoints(temp_fc.points, imgSizeOld);
+                ccalib::increaseRectSize(temp_fc.points, snapshots[i].frame.size * img.data.cols * 0.1f);
                 if (flipImg) {
-                    ccalib::flipPoints(drawFrameCorners.points, imgSizeOld);
+                    ccalib::flipPoints(temp_fc.points, imgSizeOld);
                 }
 
                 // Convert to img coordinates
-                for (auto &p : drawFrameCorners.points) {
+                for (auto &p : temp_fc.points) {
                     p *= scaling;
                     p += offset;
                 }
-                ccalib::drawRectangle(drawFrameCorners.points, ImVec4(0.56f, 0.83f, 0.26f, float(i) / n * 0.2f), 2.0f,
+                ccalib::drawRectangle(temp_fc.points, ImVec4(0.56f, 0.83f, 0.26f, float(i) / n * 0.2f), 2.0f,
                                       false);
             }
         }
 
         // Display reprojection error
-        if (calibParams.reprojErr != DBL_MAX) {
+        if (snapshots.size() >= 4 && calibParams.reprojErr != DBL_MAX) {
             string reproj_error;
             if (snapID == -1)
                 reproj_error = "Mean Reprojection Error: " + to_string(calibParams.reprojErr);

@@ -118,4 +118,20 @@ namespace ccalib {
         coverage = newCoverage;
     }
 
+    bool checkCoverage(const ccalib::CoverageParameters &coverage, const ccalib::CheckerboardFrame &frame,
+                       const float &diff) {
+        return 1.0f - frame.pos.x < coverage.x_min - diff || 1.0f - frame.pos.x > coverage.x_max + diff ||
+               1.0f - frame.pos.y < coverage.y_min - diff || 1.0f - frame.pos.y > coverage.y_max + diff ||
+               frame.size < coverage.size_min - diff || frame.size > coverage.size_max + diff ||
+               frame.skew < coverage.skew_min - diff || frame.skew > coverage.skew_max + diff;
+    }
+
+    bool checkFrameInTarget(const ccalib::CheckerboardFrame &actualFrame, const ccalib::CheckerboardFrame &targetFrame,
+                            const float &tolerance) {
+        return actualFrame.pos.x < targetFrame.pos.x + tolerance && actualFrame.pos.x > targetFrame.pos.x - tolerance &&
+               actualFrame.pos.y < targetFrame.pos.y + tolerance && actualFrame.pos.y > targetFrame.pos.y - tolerance &&
+               actualFrame.size < targetFrame.size + tolerance && actualFrame.size > targetFrame.size - tolerance &&
+               actualFrame.skew < targetFrame.skew + tolerance && actualFrame.skew > targetFrame.skew - tolerance;
+    }
+
 } // namespace ccalib
