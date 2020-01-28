@@ -55,3 +55,13 @@ Finally, build the project (substitue n with the # of cpu cores):
 ```
 make -j n
 ```
+
+## TODO
+
+- Add functionality to choose between different calibration targets (circle board etc...)
+- Add functionality to do stereo calibration
+- Add functionality to calibrate exotic sensors such as IR and DVS
+- Add funcitonality to view recorded checkerboard positions in 3D
+- Add automatic detection of supported camera formats
+- Add customizeable export path
+- Add tooltips
