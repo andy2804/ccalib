@@ -98,8 +98,8 @@ int main(int, char **) {
     bool showCamParameters = false;
     bool showCalParameters = false;
     bool showCalibration = true;
-    bool showCoverage = false;
-    bool showSnapshots = false;
+    bool showCoverage = true;
+    bool showSnapshots = true;
     bool showResults = true;
     bool camParamsChanged = false;
     bool frameChanged = false;
@@ -131,9 +131,6 @@ int main(int, char **) {
     ccalib::Corners frameCorners;
     ccalib::Corners initialCorners({cv::Point2f(0.25, 0.25), cv::Point2f(0.75, 0.25),
                                     cv::Point2f(0.75, 0.75), cv::Point2f(0.25, 0.75)});
-
-    // TODO new implementation of target corners
-//    ccalib::Corners targetCorners;
 
     ccalib::CoverageParameters coverage;
     ccalib::CalibrationParameters calibParams;
@@ -423,7 +420,7 @@ int main(int, char **) {
                 }
 
                 // Show Coverage Card
-                if (ccalib::BeginCard("Calibration", fontTitle, 2.5, showCalibration)) {
+                if (ccalib::BeginCard("Calibration", fontTitle, 2.3, showCalibration)) {
                     if (!initialized)
                         statusText = "Waiting for initialization... ";
                     ImGui::AlignTextToFramePadding();
@@ -441,6 +438,7 @@ int main(int, char **) {
                         calibParams = newCalibParams;
                         undistort = false;
                         initialized = false;
+                        calibrated = false;
                         snapID = -1;
                         snapshots.clear();
                         instanceErrs.clear();
@@ -471,7 +469,7 @@ int main(int, char **) {
                 }
 
                 // Snapshots Card
-                if (ccalib::BeginCard("Snapshots", fontTitle, 2.8f + snapshots.size() * 0.78f, showSnapshots)) {
+                if (ccalib::BeginCard("Snapshots", fontTitle, 2.7f + snapshots.size() * 0.78f, showSnapshots)) {
                     // Collect snapshot button
                     if (ccalib::MaterialButton("Snapshot", !calibrated && initialized, initialized) && cam.isStreaming())
                         takeSnapshot = true;
@@ -575,8 +573,10 @@ int main(int, char **) {
                                 snapshots.erase(snapshots.begin() + i);
                                 snapID = -1;
                                 ccalib::updateCoverage(snapshots, coverage);
-                                if (snapshots.size() < 4)
+                                if (snapshots.size() < 4) {
                                     instanceErrs.clear();
+                                    calibrated = false;
+                                }
                                 if (snapshots.empty())
                                     initialized = false;
                             }
@@ -639,6 +639,7 @@ int main(int, char **) {
             if (snapID != -1) {
                 cam.stopStream();
                 img = snapshots[snapID].img;
+                img.hasCheckerboard = true;
                 img.data = snapshots[snapID].img.data.clone();
                 corners = snapshots[snapID].corners;
                 frame = snapshots[snapID].frame;
@@ -715,7 +716,7 @@ int main(int, char **) {
             if (!initialized) {
                 ccalib::Corners temp_ic = initialCorners;
                 ccalib::relativeToAbsPoints(temp_ic.points, imgSizeOld);
-                ccalib::increaseRectSize(temp_ic.points, frame.size * img.data.cols * 0.1f);
+                ccalib::increaseRectSize(temp_ic.points, 0.5f * img.data.cols * 0.1f);
                 for (auto &p : temp_ic.points) {
                     p *= scaling;
                     p += offset;
@@ -755,7 +756,7 @@ int main(int, char **) {
         }
 
         // Draw previous recorded snapshots
-        if (!snapshots.empty()) {
+        if (!snapshots.empty() && img.hasCheckerboard) {
             int n = snapshots.size() - 1;
             for (int i = n; i > 0; i--) {
                 ccalib::Corners temp_fc = snapshots[i].frameCorners;
