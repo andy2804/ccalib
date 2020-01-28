@@ -8,9 +8,8 @@ or ROS-node to publish images first (the camera needs to be mountable as /dev/vi
 
 ![Screenshot](resources/screenshot.png)
 
-The app provides intuitive instructions to take snapshots for calibration in an automatic fashion as well as offers
-the possibility to manually take additional snapshots for refinement. It shows camera parameter coverage and 
-also re-projection error for every single frame that has been taken.
+The app provides intuitive way to take snapshots for calibration in an automatic fashion as well as offers
+the possibility to manually take additional snapshots for refinement. It shows camera parameter coverage, as well as the re-projection error for every single frame that has been taken.
 
 Results can easily be exported in YAML format.
 
