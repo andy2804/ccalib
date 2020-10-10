@@ -165,7 +165,7 @@ int main(int, char **) {
     state.cameras = cameras;
 
     // Try to open connection to first camera in device list
-    ccalib::Camera cam(cameras[camID], camParams);
+    ccalib::Camera cam((cameras.size()) ? cameras[camID] : "", camParams);
 
     // Main loop
     bool done = false;
