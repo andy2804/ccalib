@@ -19,3 +19,6 @@ venv
 
 # Docker images
 *.tar
+
+# VSCode
+.vscode/*
